@@ -1,0 +1,21 @@
+{
+  "name": "Habitww",
+  "short_name": "Habitww",
+  "description": "毎日の習慣を記録し、GitHub風の草グラフで可視化するアプリ",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4caf50",
+  "icons": [
+    {
+      "src": "/habitww_icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/habitww_icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

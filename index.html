@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/habitww_icon.png" />
+    <meta name="viewport" content="initial-scale=1, width=device-width" />
+    <title>Habitww</title>
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Habitww" />
+    <link rel="apple-touch-icon" href="/habitww_icon.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta property="og:image" content="/app-icon-512.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="/app-icon-512.png">
+    <style>
+      /* Minimal reset — matches MUI defaults so skeleton blends in */
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; height: 100%; }
+      body {
+        background: #f5f7f5;
+        font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      @media (prefers-color-scheme: dark) {
+        body { background: #121212; }
+        .hs-appbar  { background: #1e1e1e !important; border-color: #2c2c2c !important; }
+        .hs-shimmer { background: #2c2c2c !important; }
+        .hs-shimmer::after { background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent) !important; }
+        .hs-card    { background: #1e1e1e !important; border-color: #2c2c2c !important; }
+      }
+
+      /* AppBar */
+      .hs-appbar {
+        position: sticky; top: 0; z-index: 100;
+        background: #ffffff;
+        border-bottom: 1px solid #e0e0e0;
+        height: 64px;
+        display: flex; align-items: center;
+        padding: 0 16px;
+      }
+
+      /* Shimmer animation */
+      @keyframes hs-shimmer {
+        0%   { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
+      }
+      .hs-shimmer {
+        position: relative; overflow: hidden;
+        background: #e0e0e0;
+        border-radius: 6px;
+      }
+      .hs-shimmer::after {
+        content: '';
+        position: absolute; inset: 0;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
+        animation: hs-shimmer 1.4s ease-in-out infinite;
+      }
+
+      /* Content area */
+      .hs-content {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 12px 12px 80px;
+      }
+      @media (min-width: 600px) {
+        .hs-content { padding: 24px 24px 80px; }
+      }
+
+      /* Card */
+      .hs-card {
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+      }
+
+      /* Bottom nav */
+      .hs-bottom-nav {
+        position: fixed; bottom: 0; left: 0; right: 0;
+        height: 56px;
+        background: #fff;
+        border-top: 1px solid #e0e0e0;
+        display: flex; align-items: center; justify-content: space-around;
+        z-index: 100;
+      }
+      @media (prefers-color-scheme: dark) {
+        .hs-bottom-nav { background: #1e1e1e; border-color: #2c2c2c; }
+      }
+      .hs-bottom-nav-item {
+        display: flex; flex-direction: column; align-items: center; gap: 2px;
+        flex: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <!-- Static skeleton shown before React mounts; replaced automatically -->
+      <div class="hs-appbar">
+        <div class="hs-shimmer" style="width:120px;height:22px;border-radius:4px;"></div>
+        <div style="flex:1"></div>
+        <div class="hs-shimmer" style="width:32px;height:32px;border-radius:50%;"></div>
+      </div>
+
+      <div class="hs-content">
+        <div class="hs-shimmer" style="width:160px;height:18px;margin-bottom:16px;"></div>
+        <div class="hs-card">
+          <div class="hs-shimmer" style="width:40%;height:16px;margin-bottom:12px;"></div>
+          <div class="hs-shimmer" style="width:100%;height:14px;margin-bottom:8px;"></div>
+          <div class="hs-shimmer" style="width:80%;height:14px;margin-bottom:16px;"></div>
+          <div style="display:flex;gap:8px;margin-bottom:12px;">
+            <div class="hs-shimmer" style="width:60px;height:28px;border-radius:14px;"></div>
+            <div class="hs-shimmer" style="width:60px;height:28px;border-radius:14px;"></div>
+            <div class="hs-shimmer" style="width:60px;height:28px;border-radius:14px;"></div>
+            <div class="hs-shimmer" style="width:60px;height:28px;border-radius:14px;"></div>
+            <div class="hs-shimmer" style="width:60px;height:28px;border-radius:14px;"></div>
+            <div class="hs-shimmer" style="width:60px;height:28px;border-radius:14px;"></div>
+            <div class="hs-shimmer" style="width:60px;height:28px;border-radius:14px;"></div>
+          </div>
+          <div class="hs-shimmer" style="width:100%;height:40px;border-radius:8px;"></div>
+        </div>
+        <div class="hs-card">
+          <div class="hs-shimmer" style="width:35%;height:16px;margin-bottom:12px;"></div>
+          <div class="hs-shimmer" style="width:100%;height:14px;margin-bottom:8px;"></div>
+          <div class="hs-shimmer" style="width:70%;height:14px;margin-bottom:16px;"></div>
+          <div style="display:flex;gap:8px;margin-bottom:12px;">
+            <div class="hs-shimmer" style="width:60px;height:28px;border-radius:14px;"></div>
+            <div class="hs-shimmer" style="width:60px;height:28px;border-radius:14px;"></div>
+            <div class="hs-shimmer" style="width:60px;height:28px;border-radius:14px;"></div>
+            <div class="hs-shimmer" style="width:60px;height:28px;border-radius:14px;"></div>
+            <div class="hs-shimmer" style="width:60px;height:28px;border-radius:14px;"></div>
+            <div class="hs-shimmer" style="width:60px;height:28px;border-radius:14px;"></div>
+            <div class="hs-shimmer" style="width:60px;height:28px;border-radius:14px;"></div>
+          </div>
+          <div class="hs-shimmer" style="width:100%;height:40px;border-radius:8px;"></div>
+        </div>
+        <div class="hs-card">
+          <div class="hs-shimmer" style="width:50%;height:16px;margin-bottom:12px;"></div>
+          <div class="hs-shimmer" style="width:100%;height:14px;margin-bottom:8px;"></div>
+          <div class="hs-shimmer" style="width:60%;height:14px;margin-bottom:16px;"></div>
+          <div style="display:flex;gap:8px;margin-bottom:12px;">
+            <div class="hs-shimmer" style="width:60px;height:28px;border-radius:14px;"></div>
+            <div class="hs-shimmer" style="width:60px;height:28px;border-radius:14px;"></div>
+            <div class="hs-shimmer" style="width:60px;height:28px;border-radius:14px;"></div>
+            <div class="hs-shimmer" style="width:60px;height:28px;border-radius:14px;"></div>
+            <div class="hs-shimmer" style="width:60px;height:28px;border-radius:14px;"></div>
+            <div class="hs-shimmer" style="width:60px;height:28px;border-radius:14px;"></div>
+            <div class="hs-shimmer" style="width:60px;height:28px;border-radius:14px;"></div>
+          </div>
+          <div class="hs-shimmer" style="width:100%;height:40px;border-radius:8px;"></div>
+        </div>
+      </div>
+
+      <div class="hs-bottom-nav">
+        <div class="hs-bottom-nav-item">
+          <div class="hs-shimmer" style="width:24px;height:24px;border-radius:4px;"></div>
+          <div class="hs-shimmer" style="width:36px;height:10px;border-radius:3px;"></div>
+        </div>
+        <div class="hs-bottom-nav-item">
+          <div class="hs-shimmer" style="width:24px;height:24px;border-radius:4px;"></div>
+          <div class="hs-shimmer" style="width:36px;height:10px;border-radius:3px;"></div>
+        </div>
+        <div class="hs-bottom-nav-item">
+          <div class="hs-shimmer" style="width:24px;height:24px;border-radius:4px;"></div>
+          <div class="hs-shimmer" style="width:36px;height:10px;border-radius:3px;"></div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
