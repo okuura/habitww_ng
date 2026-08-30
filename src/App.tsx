@@ -49,7 +49,17 @@ import { alpha, darken, lighten } from '@mui/material/styles';
 import { keyframes } from '@emotion/react';
 import type { User } from '@supabase/supabase-js';
 import theme from './theme';
-import { supabase, type Habit, type HabitCompletion, type HabitShare } from './supabase';
+import {
+  supabase,
+  initialSession,
+  takePreloadedData,
+  readCachedData,
+  writeCachedData,
+  clearCachedData,
+  type Habit,
+  type HabitCompletion,
+  type HabitShare,
+} from './supabase';
 import ActivityGrid from './ActivityGrid';
 import LoginPage from './LoginPage';
 
@@ -57,6 +67,10 @@ const StatsPage = lazy(() => import('./StatsPage'));
 const ShareModal = lazy(() => import('./ShareModal'));
 const QRScannerDialog = lazy(() => import('./QRScannerDialog'));
 const ShareHabitsPage = lazy(() => import('./ShareHabitsPage'));
+
+// Last known data, read once at startup. Lets the app paint real content
+// immediately (stale-while-revalidate) while auth + fresh data load.
+const initialCache = readCachedData();
 
 const HABIT_COLORS = [
   '#4caf50', '#2196f3', '#ff9800', '#e91e63',
@@ -205,9 +219,9 @@ function AppContent() {
   const { mode, setMode } = useColorScheme();
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [habits, setHabits] = useState<Habit[]>([]);
-  const [completions, setCompletions] = useState<HabitCompletion[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [habits, setHabits] = useState<Habit[]>(initialCache?.habits ?? []);
+  const [completions, setCompletions] = useState<HabitCompletion[]>(initialCache?.completions ?? []);
+  const [loading, setLoading] = useState(initialCache === null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newHabitName, setNewHabitName] = useState('');
   const [newHabitColor, setNewHabitColor] = useState(HABIT_COLORS[0]);
@@ -242,13 +256,15 @@ function AppContent() {
   yesterday.setDate(yesterday.getDate() - 1);
   const yesterdayStr = toLocalDateString(yesterday);
 
-  // Auth state listener
+  // Auth state listener (initialSession was kicked off at module load,
+  // in parallel with React mounting)
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    initialSession.then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setAuthLoading(false);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') clearCachedData();
       setUser(session?.user ?? null);
     });
     return () => subscription.unsubscribe();
@@ -256,15 +272,33 @@ function AppContent() {
 
   const fetchData = useCallback(async () => {
     if (!user) return;
-    setLoading(true);
-    const [{ data: habitsData }, { data: completionsData }] = await Promise.all([
-      supabase.from('habits').select('*').order('created_at', { ascending: true }),
-      supabase.from('habit_completions').select('*'),
-    ]);
-    setHabits(habitsData ?? []);
-    setCompletions(completionsData ?? []);
+    // First load consumes the eager fetch started at module load; later
+    // calls (after add/delete) refetch. No setLoading(true): cached/current
+    // content stays visible while fresh data arrives.
+    const preloaded = takePreloadedData();
+    let data = preloaded ? await preloaded : null;
+    if (!data) {
+      const [{ data: habitsData }, { data: completionsData }] = await Promise.all([
+        supabase.from('habits').select('*').order('created_at', { ascending: true }),
+        supabase.from('habit_completions').select('*'),
+      ]);
+      data = { habits: habitsData ?? [], completions: completionsData ?? [] };
+    }
+    setHabits(data.habits);
+    setCompletions(data.completions);
     setLoading(false);
   }, [user]);
+
+  // Persist current data (including optimistic updates) for instant next launch
+  useEffect(() => {
+    if (loading || !user) return;
+    writeCachedData({
+      habits,
+      completions,
+      userName: user.user_metadata?.name as string | undefined,
+      userAvatar: user.user_metadata?.avatar_url as string | undefined,
+    });
+  }, [habits, completions, loading, user]);
 
   const fetchMyShares = useCallback(async () => {
     if (!user) return;
@@ -441,6 +475,7 @@ function AppContent() {
 
   const handleSignOut = async () => {
     setAccountMenuAnchor(null);
+    clearCachedData();
     await supabase.auth.signOut();
     setHabits([]);
     setCompletions([]);
@@ -450,6 +485,7 @@ function AppContent() {
   const handleDeleteAccount = async () => {
     setDeletingAccount(true);
     await supabase.from('habits').delete().eq('user_id', user!.id);
+    clearCachedData();
     await supabase.auth.signOut();
     setDeletingAccount(false);
     setDeleteAccountDialogOpen(false);
@@ -484,16 +520,20 @@ function AppContent() {
   };
 
   const completedCount = habits.filter(h => completedToday.has(h.id)).length;
-  const avatarLetter = user?.user_metadata?.name
-    ? (user.user_metadata.name as string)[0].toUpperCase()
-    : user?.email?.[0].toUpperCase() ?? '?';
-  const avatarSrc = user?.user_metadata?.avatar_url as string | undefined;
+  const displayName = (user?.user_metadata?.name as string | undefined) ?? initialCache?.userName;
+  const avatarLetter = displayName?.[0]?.toUpperCase()
+    ?? user?.email?.[0].toUpperCase() ?? '?';
+  const avatarSrc = (user?.user_metadata?.avatar_url as string | undefined)
+    ?? (user ? undefined : initialCache?.userAvatar);
 
-  if (authLoading) {
+  // With cached data we render the real UI immediately, even while the
+  // session is still being restored (user briefly null). Without cache,
+  // wait for auth to know whether to show the app or the login page.
+  if (authLoading && !initialCache) {
     return <AppShellSkeleton />;
   }
 
-  if (!user) return <LoginPage />;
+  if (!authLoading && !user) return <LoginPage />;
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
@@ -534,7 +574,7 @@ function AppContent() {
       >
         <Box sx={{ px: 2, py: 1.5 }}>
           <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-            {(user.user_metadata?.name as string) || 'ユーザー'}
+            {displayName || 'ユーザー'}
           </Typography>
         </Box>
         <Divider />
@@ -800,7 +840,7 @@ function AppContent() {
           </Suspense>
         )}
 
-        {page === 'share' && (
+        {page === 'share' && user && (
           <Suspense fallback={<SharePageSkeleton />}>
             <ShareHabitsPage user={user} onScanQR={() => setScannerOpen(true)} />
           </Suspense>
@@ -1034,7 +1074,7 @@ function AppContent() {
       </Dialog>
 
       {/* Share Modal (QR code display) */}
-      {shareModalHabit && (
+      {shareModalHabit && user && (
         <Suspense fallback={null}>
         <ShareModal
           open={!!shareModalHabit}

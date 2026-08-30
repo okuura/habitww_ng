@@ -2,6 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- Open the Supabase connection (DNS/TCP/TLS) while JS is still parsing -->
+    <link rel="preconnect" href="%VITE_SUPABASE_URL%" crossorigin />
+    <link rel="dns-prefetch" href="%VITE_SUPABASE_URL%" />
     <link rel="icon" type="image/png" href="/habitww_icon.png" />
     <meta name="viewport" content="initial-scale=1, width=device-width" />
     <title>Habitww</title>
