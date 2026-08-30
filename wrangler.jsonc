@@ -2,6 +2,9 @@
   // Cloudflare Workers config: static-assets-only deployment (no Worker script needed).
   "name": "habitww-ng",
   "compatibility_date": "2026-08-30",
+  "routes": [
+    { "pattern": "habitww.pacelong.life", "custom_domain": true }
+  ],
   "assets": {
     "directory": "./dist",
     "not_found_handling": "single-page-application"
