@@ -1,9 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useId } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
 import LinearProgress from '@mui/material/LinearProgress';
-import { alpha, useTheme } from '@mui/material/styles';
+import { alpha, darken, lighten } from '@mui/material/styles';
 import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
 import MilitaryTechIcon from '@mui/icons-material/MilitaryTech';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
@@ -115,9 +115,79 @@ function computeHabitBadges(habit: Habit, dates: Set<string>, today: Date): Habi
   return { habit, perfectMonths, ongoingDaysLeft, currentStreak, bestStreak };
 }
 
-export default function Badges({ habits, completions }: BadgesProps) {
-  const theme = useTheme();
+// --- Medal (SVG) -----------------------------------------------------------
+// A ribbon-and-disc medal. `value`+`unit` engraved in the center, `year`
+// stamped below it. `ongoing` renders a dashed "not yet earned" ghost.
 
+interface MedalProps {
+  color: string;
+  value: string;
+  unit: string;
+  year?: string;
+  ribbonColor?: string;
+  ongoing?: boolean;
+}
+
+function Medal({ color, value, unit, year, ribbonColor, ongoing }: MedalProps) {
+  const gid = useId();
+  const rim = darken(color, 0.35);
+  const ribbon = ribbonColor ?? darken(color, 0.18);
+  const ribbonLight = ribbonColor ? lighten(ribbonColor, 0.15) : darken(color, 0.05);
+  const valueSize = value.length >= 4 ? 10.5 : value.length === 3 ? 12 : 14;
+
+  return (
+    <svg width={48} height={62} viewBox="0 0 48 62" aria-hidden focusable="false">
+      {!ongoing && (
+        <>
+          {/* Ribbon straps */}
+          <polygon points="13,0 22,0 27,24 18,27" fill={ribbon} />
+          <polygon points="26,0 35,0 30,27 21,24" fill={ribbonLight} />
+          <defs>
+            <linearGradient id={`${gid}-m`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={lighten(color, 0.3)} />
+              <stop offset="55%" stopColor={color} />
+              <stop offset="100%" stopColor={darken(color, 0.28)} />
+            </linearGradient>
+          </defs>
+          {/* Disc */}
+          <circle cx={24} cy={40} r={19} fill={`url(#${gid}-m)`} stroke={rim} strokeWidth={1.5} />
+          {/* Engraved inner ring */}
+          <circle cx={24} cy={40} r={15.5} fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth={1} />
+          {/* Gloss highlight */}
+          <ellipse cx={17.5} cy={32} rx={9} ry={4.5} fill="rgba(255,255,255,0.22)" transform="rotate(-24 17.5 32)" />
+          {/* Value */}
+          <text x={24} y={41.5} textAnchor="middle" fontWeight={800} fontSize={valueSize} fill="#fff">
+            {value}
+            <tspan fontSize={7} fontWeight={700}>{unit}</tspan>
+          </text>
+          {year && (
+            <text x={24} y={50} textAnchor="middle" fontWeight={600} fontSize={6} fill="rgba(255,255,255,0.85)" letterSpacing={0.5}>
+              {year}
+            </text>
+          )}
+        </>
+      )}
+      {ongoing && (
+        <>
+          <polygon points="13,0 22,0 27,24 18,27" fill={alpha(ribbon, 0.25)} />
+          <polygon points="26,0 35,0 30,27 21,24" fill={alpha(ribbonLight, 0.25)} />
+          <circle cx={24} cy={40} r={19} fill={alpha(color, 0.08)} stroke={alpha(color, 0.65)} strokeWidth={1.5} strokeDasharray="4 3" />
+          <text x={24} y={41.5} textAnchor="middle" fontWeight={800} fontSize={valueSize} fill={color}>
+            {value}
+            <tspan fontSize={7} fontWeight={700}>{unit}</tspan>
+          </text>
+          {year && (
+            <text x={24} y={50} textAnchor="middle" fontWeight={600} fontSize={6} fill={alpha(color, 0.8)} letterSpacing={0.5}>
+              {year}
+            </text>
+          )}
+        </>
+      )}
+    </svg>
+  );
+}
+
+export default function Badges({ habits, completions }: BadgesProps) {
   const habitBadges = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -138,8 +208,6 @@ export default function Badges({ habits, completions }: BadgesProps) {
   }, [totalCount]);
 
   const currentYear = new Date().getFullYear();
-  const monthLabel = (b: MonthBadge) =>
-    b.year === currentYear ? `${b.month}月` : `${b.year}年${b.month}月`;
 
   if (habits.length === 0) return null;
 
@@ -174,42 +242,33 @@ export default function Badges({ habits, completions }: BadgesProps) {
               )}
             </Box>
 
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 1 }}>
               {perfectMonths.map(b => (
-                <Box
-                  key={`${b.year}-${b.month}`}
-                  sx={{
-                    display: 'flex', alignItems: 'center', gap: 0.4,
-                    px: 1, py: 0.4, borderRadius: 4,
-                    bgcolor: alpha(habit.color, theme.palette.mode === 'dark' ? 0.18 : 0.1),
-                    border: '1px solid', borderColor: alpha(habit.color, 0.45),
-                  }}
-                >
-                  <WorkspacePremiumIcon sx={{ fontSize: 14, color: habit.color }} />
-                  <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '0.68rem', color: 'text.primary', lineHeight: 1 }}>
-                    {monthLabel(b)}
-                  </Typography>
+                <Box key={`${b.year}-${b.month}`} sx={{ lineHeight: 0 }}>
+                  <Medal color={habit.color} value={String(b.month)} unit="月" year={String(b.year)} />
                 </Box>
               ))}
 
               {ongoingDaysLeft !== null && (
-                <Box
-                  sx={{
-                    display: 'flex', alignItems: 'center', gap: 0.4,
-                    px: 1, py: 0.4, borderRadius: 4,
-                    border: '1.5px dashed', borderColor: alpha(habit.color, 0.6),
-                  }}
-                >
-                  <WorkspacePremiumIcon sx={{ fontSize: 14, color: alpha(habit.color, 0.55) }} />
-                  <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '0.68rem', color: 'text.secondary', lineHeight: 1 }}>
-                    今月継続中・あと{ongoingDaysLeft}日
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25 }}>
+                  <Box sx={{ lineHeight: 0 }}>
+                    <Medal
+                      color={habit.color}
+                      value={String(new Date().getMonth() + 1)}
+                      unit="月"
+                      year={String(currentYear)}
+                      ongoing
+                    />
+                  </Box>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.62rem', fontWeight: 600, lineHeight: 1 }}>
+                    あと{ongoingDaysLeft}日
                   </Typography>
                 </Box>
               )}
 
               {perfectMonths.length === 0 && ongoingDaysLeft === null && (
                 <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.68rem' }}>
-                  1か月休まず実施するとバッジ獲得
+                  1か月休まず実施するとメダル獲得
                 </Typography>
               )}
             </Box>
@@ -227,21 +286,10 @@ export default function Badges({ habits, completions }: BadgesProps) {
             </Typography>
           </Box>
 
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: milestones.next ? 1 : 0 }}>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: milestones.next ? 1 : 0 }}>
             {milestones.achieved.map(m => (
-              <Box
-                key={m}
-                sx={{
-                  display: 'flex', alignItems: 'center', gap: 0.4,
-                  px: 1, py: 0.4, borderRadius: 4,
-                  bgcolor: alpha(theme.palette.warning.main, theme.palette.mode === 'dark' ? 0.2 : 0.12),
-                  border: '1px solid', borderColor: alpha(theme.palette.warning.main, 0.5),
-                }}
-              >
-                <MilitaryTechIcon sx={{ fontSize: 14, color: 'warning.main' }} />
-                <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '0.68rem', color: 'text.primary', lineHeight: 1 }}>
-                  {m}回
-                </Typography>
+              <Box key={m} sx={{ lineHeight: 0 }}>
+                <Medal color="#D4A017" ribbonColor="#B03A2E" value={String(m)} unit="回" />
               </Box>
             ))}
           </Box>
