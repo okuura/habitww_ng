@@ -10,6 +10,7 @@ import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import type { Habit, HabitCompletion } from './supabase';
 import AchievementDots from './AchievementDots';
+import Badges from './Badges';
 
 interface StatsPageProps {
   habits: Habit[];
@@ -244,7 +245,17 @@ export default function StatsPage({ habits, completions }: StatsPageProps) {
         </CardContent>
       </Card>
 
-      {/* 2. Total effort — dot visualisation */}
+      {/* 2. Achievement badges — perfect months, streaks, milestones */}
+      <Card
+        elevation={0}
+        sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2 }}
+      >
+        <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+          <Badges habits={habits} completions={completions} />
+        </CardContent>
+      </Card>
+
+      {/* 3. Total effort — dot visualisation */}
       <Card
         elevation={0}
         sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2 }}
@@ -254,7 +265,7 @@ export default function StatsPage({ habits, completions }: StatsPageProps) {
         </CardContent>
       </Card>
 
-      {/* 3. Time of day */}
+      {/* 4. Time of day */}
       <Card
         elevation={0}
         sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2 }}
