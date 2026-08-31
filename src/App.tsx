@@ -576,6 +576,9 @@ function AppContent() {
           <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
             {displayName || 'ユーザー'}
           </Typography>
+          <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.6rem' }}>
+            build {__BUILD_TIME__}
+          </Typography>
         </Box>
         <Divider />
         <MenuItem

@@ -20,7 +20,7 @@ const TOTAL_MILESTONES = [50, 100, 250, 500, 1000, 2000, 5000];
 // Subtle gold twinkle for milestone medals
 const goldShine = keyframes`
   0%, 100% { filter: brightness(1) drop-shadow(0 0 0px rgba(255, 215, 0, 0)); }
-  50%      { filter: brightness(1.12) drop-shadow(0 0 5px rgba(255, 215, 0, 0.5)); }
+  50%      { filter: brightness(1.18) drop-shadow(0 0 6px rgba(255, 215, 0, 0.65)); }
 `;
 
 function toLocalDateString(date: Date): string {
@@ -133,9 +133,11 @@ interface MedalProps {
   year?: string;
   ribbonColor?: string;
   ongoing?: boolean;
+  /** Periodic specular streak sweeping across the disc */
+  shine?: boolean;
 }
 
-function Medal({ color, value, unit, year, ribbonColor, ongoing }: MedalProps) {
+function Medal({ color, value, unit, year, ribbonColor, ongoing, shine }: MedalProps) {
   const gid = useId();
   const rim = darken(color, 0.35);
   const ribbon = ribbonColor ?? darken(color, 0.18);
@@ -171,6 +173,28 @@ function Medal({ color, value, unit, year, ribbonColor, ongoing }: MedalProps) {
             <text x={24} y={50} textAnchor="middle" fontWeight={600} fontSize={6} fill="rgba(255,255,255,0.85)" letterSpacing={0.5}>
               {year}
             </text>
+          )}
+          {shine && (
+            <>
+              <defs>
+                <linearGradient id={`${gid}-sh`} x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="rgba(255,255,255,0)" />
+                  <stop offset="50%" stopColor="rgba(255,255,240,0.75)" />
+                  <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+                </linearGradient>
+                <clipPath id={`${gid}-cl`}>
+                  <circle cx={24} cy={40} r={19} />
+                </clipPath>
+              </defs>
+              <g clipPath={`url(#${gid}-cl)`}>
+                <g transform="skewX(-18)">
+                  <rect y={18} width={11} height={46} fill={`url(#${gid}-sh)`}>
+                    {/* sweep for ~1.2s, then rest until the 4s cycle repeats */}
+                    <animate attributeName="x" values="-24;74;74" keyTimes="0;0.3;1" dur="4s" repeatCount="indefinite" />
+                  </rect>
+                </g>
+              </g>
+            </>
           )}
         </>
       )}
@@ -303,7 +327,7 @@ export default function Badges({ habits, completions }: BadgesProps) {
                   animationDelay: `${i * 0.5}s`,
                 }}
               >
-                <Medal color="#D4A017" ribbonColor="#B03A2E" value={String(m)} unit="回" />
+                <Medal color="#D4A017" ribbonColor="#B03A2E" value={String(m)} unit="回" shine />
               </Box>
             ))}
           </Box>
