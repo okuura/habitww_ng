@@ -4,6 +4,7 @@ import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
 import LinearProgress from '@mui/material/LinearProgress';
 import { alpha, darken, lighten } from '@mui/material/styles';
+import { keyframes } from '@emotion/react';
 import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
 import MilitaryTechIcon from '@mui/icons-material/MilitaryTech';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
@@ -15,6 +16,12 @@ interface BadgesProps {
 }
 
 const TOTAL_MILESTONES = [50, 100, 250, 500, 1000, 2000, 5000];
+
+// Subtle gold twinkle for milestone medals
+const goldShine = keyframes`
+  0%, 100% { filter: brightness(1) drop-shadow(0 0 0px rgba(255, 215, 0, 0)); }
+  50%      { filter: brightness(1.12) drop-shadow(0 0 5px rgba(255, 215, 0, 0.5)); }
+`;
 
 function toLocalDateString(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -136,7 +143,7 @@ function Medal({ color, value, unit, year, ribbonColor, ongoing }: MedalProps) {
   const valueSize = value.length >= 4 ? 10.5 : value.length === 3 ? 12 : 14;
 
   return (
-    <svg width={48} height={62} viewBox="0 0 48 62" aria-hidden focusable="false">
+    <svg width={40} height={52} viewBox="0 0 48 62" aria-hidden focusable="false">
       {!ongoing && (
         <>
           {/* Ribbon straps */}
@@ -287,8 +294,15 @@ export default function Badges({ habits, completions }: BadgesProps) {
           </Box>
 
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: milestones.next ? 1 : 0 }}>
-            {milestones.achieved.map(m => (
-              <Box key={m} sx={{ lineHeight: 0 }}>
+            {milestones.achieved.map((m, i) => (
+              <Box
+                key={m}
+                sx={{
+                  lineHeight: 0,
+                  animation: `${goldShine} 3.2s ease-in-out infinite`,
+                  animationDelay: `${i * 0.5}s`,
+                }}
+              >
                 <Medal color="#D4A017" ribbonColor="#B03A2E" value={String(m)} unit="回" />
               </Box>
             ))}
