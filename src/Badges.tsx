@@ -6,7 +6,7 @@ import LinearProgress from '@mui/material/LinearProgress';
 import { alpha, darken, lighten } from '@mui/material/styles';
 import { keyframes } from '@emotion/react';
 import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
-import MilitaryTechIcon from '@mui/icons-material/MilitaryTech';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import type { Habit, HabitCompletion } from './supabase';
 
@@ -17,10 +17,10 @@ interface BadgesProps {
 
 const TOTAL_MILESTONES = [50, 100, 250, 500, 1000, 2000, 5000];
 
-// Subtle gold twinkle for milestone medals
-const goldShine = keyframes`
-  0%, 100% { filter: brightness(1) drop-shadow(0 0 0px rgba(255, 215, 0, 0)); }
-  50%      { filter: brightness(1.18) drop-shadow(0 0 6px rgba(255, 215, 0, 0.65)); }
+// Trophy: constant golden halo, with the trophy itself flaring every 2s
+const trophyGlow = keyframes`
+  0%, 100% { filter: brightness(1) drop-shadow(0 0 4px rgba(255, 200, 0, 0.55)); }
+  50%      { filter: brightness(1.28) drop-shadow(0 0 9px rgba(255, 215, 0, 0.9)); }
 `;
 
 function toLocalDateString(date: Date): string {
@@ -44,7 +44,6 @@ interface HabitBadges {
 function computeHabitBadges(habit: Habit, dates: Set<string>, today: Date): HabitBadges {
   const todayStr = toLocalDateString(today);
 
-  // Judge from the day the habit was created (never before it existed)
   const created = new Date(habit.created_at);
   created.setHours(0, 0, 0, 0);
 
@@ -59,7 +58,14 @@ function computeHabitBadges(habit: Habit, dates: Set<string>, today: Date): Habi
     const monthEnd = new Date(y, m + 1, 0); // last day of month
     const isCurrentMonth = y === today.getFullYear() && m === today.getMonth();
 
-    const judgeStart = created > cursor ? created : cursor;
+    // Strict rule: every single day of the calendar month must be done.
+    // A month the habit was created mid-way can never earn the medal.
+    if (created > cursor) {
+      cursor.setMonth(cursor.getMonth() + 1);
+      continue;
+    }
+
+    const judgeStart = cursor;
     const judgeEnd = isCurrentMonth ? today : monthEnd;
 
     let perfect = judgeStart <= judgeEnd;
@@ -133,11 +139,9 @@ interface MedalProps {
   year?: string;
   ribbonColor?: string;
   ongoing?: boolean;
-  /** Periodic specular streak sweeping across the disc */
-  shine?: boolean;
 }
 
-function Medal({ color, value, unit, year, ribbonColor, ongoing, shine }: MedalProps) {
+function Medal({ color, value, unit, year, ribbonColor, ongoing }: MedalProps) {
   const gid = useId();
   const rim = darken(color, 0.35);
   const ribbon = ribbonColor ?? darken(color, 0.18);
@@ -174,28 +178,6 @@ function Medal({ color, value, unit, year, ribbonColor, ongoing, shine }: MedalP
               {year}
             </text>
           )}
-          {shine && (
-            <>
-              <defs>
-                <linearGradient id={`${gid}-sh`} x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="rgba(255,255,255,0)" />
-                  <stop offset="50%" stopColor="rgba(255,255,240,0.75)" />
-                  <stop offset="100%" stopColor="rgba(255,255,255,0)" />
-                </linearGradient>
-                <clipPath id={`${gid}-cl`}>
-                  <circle cx={24} cy={40} r={19} />
-                </clipPath>
-              </defs>
-              <g clipPath={`url(#${gid}-cl)`}>
-                <g transform="skewX(-18)">
-                  <rect y={18} width={11} height={46} fill={`url(#${gid}-sh)`}>
-                    {/* sweep for ~1.2s, then rest until the 4s cycle repeats */}
-                    <animate attributeName="x" values="-24;74;74" keyTimes="0;0.3;1" dur="4s" repeatCount="indefinite" />
-                  </rect>
-                </g>
-              </g>
-            </>
-          )}
         </>
       )}
       {ongoing && (
@@ -214,6 +196,62 @@ function Medal({ color, value, unit, year, ribbonColor, ongoing, shine }: MedalP
           )}
         </>
       )}
+    </svg>
+  );
+}
+
+// --- Trophy (SVG) ----------------------------------------------------------
+// Gold cup for cumulative milestones: lip, bowl with handles, stem and
+// two-tier base. A specular streak sweeps the bowl every 2s (SMIL).
+
+function Trophy({ value, unit }: { value: string; unit: string }) {
+  const gid = useId();
+  const valueSize = value.length >= 4 ? 9 : value.length === 3 ? 10.5 : 12;
+  const BOWL = 'M13 14 H35 V25 C35 34 30 39 24 39 C18 39 13 34 13 25 Z';
+
+  return (
+    <svg width={40} height={52} viewBox="0 0 48 62" aria-hidden focusable="false">
+      <defs>
+        <linearGradient id={`${gid}-g`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#FFE082" />
+          <stop offset="55%" stopColor="#E6B31E" />
+          <stop offset="100%" stopColor="#8B6914" />
+        </linearGradient>
+        <linearGradient id={`${gid}-sh`} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="rgba(255,255,255,0)" />
+          <stop offset="50%" stopColor="rgba(255,255,240,0.8)" />
+          <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+        </linearGradient>
+        <clipPath id={`${gid}-cl`}>
+          <path d={BOWL} />
+        </clipPath>
+      </defs>
+
+      {/* Handles */}
+      <path d="M13 16 C5 16 5 27 13.5 29" fill="none" stroke={`url(#${gid}-g)`} strokeWidth={3} strokeLinecap="round" />
+      <path d="M35 16 C43 16 43 27 34.5 29" fill="none" stroke={`url(#${gid}-g)`} strokeWidth={3} strokeLinecap="round" />
+      {/* Bowl + lip */}
+      <path d={BOWL} fill={`url(#${gid}-g)`} stroke="#7A5C0E" strokeWidth={1} />
+      <rect x={11} y={10} width={26} height={4.5} rx={2} fill={`url(#${gid}-g)`} stroke="#7A5C0E" strokeWidth={1} />
+      {/* Gloss */}
+      <ellipse cx={18.5} cy={20} rx={5.5} ry={2.8} fill="rgba(255,255,255,0.3)" transform="rotate(-22 18.5 20)" />
+      {/* Stem + base */}
+      <path d="M21.5 39 h5 l1.2 6.5 h-7.4 Z" fill={`url(#${gid}-g)`} stroke="#7A5C0E" strokeWidth={0.8} />
+      <rect x={16} y={45.5} width={16} height={3.5} rx={1} fill={`url(#${gid}-g)`} stroke="#7A5C0E" strokeWidth={0.8} />
+      <rect x={13} y={49} width={22} height={5} rx={1.5} fill={`url(#${gid}-g)`} stroke="#7A5C0E" strokeWidth={0.8} />
+      {/* Value engraved on the bowl */}
+      <text x={24} y={28} textAnchor="middle" fontWeight={800} fontSize={valueSize} fill="#fff">
+        {value}
+        <tspan fontSize={6.5} fontWeight={700}>{unit}</tspan>
+      </text>
+      {/* Specular sweep across the bowl, every 2s */}
+      <g clipPath={`url(#${gid}-cl)`}>
+        <g transform="skewX(-18)">
+          <rect y={12} width={10} height={30} fill={`url(#${gid}-sh)`}>
+            <animate attributeName="x" values="-20;68;68" keyTimes="0;0.45;1" dur="2s" repeatCount="indefinite" />
+          </rect>
+        </g>
+      </g>
     </svg>
   );
 }
@@ -299,7 +337,7 @@ export default function Badges({ habits, completions }: BadgesProps) {
 
               {perfectMonths.length === 0 && ongoingDaysLeft === null && (
                 <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.68rem' }}>
-                  1か月休まず実施するとメダル獲得
+                  月の1日〜末日まで毎日実施するとメダル獲得
                 </Typography>
               )}
             </Box>
@@ -311,7 +349,7 @@ export default function Badges({ habits, completions }: BadgesProps) {
       {totalCount > 0 && (
         <Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.75 }}>
-            <MilitaryTechIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+            <EmojiEventsIcon sx={{ fontSize: 16, color: 'warning.main' }} />
             <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
               累計マイルストーン
             </Typography>
@@ -323,11 +361,11 @@ export default function Badges({ habits, completions }: BadgesProps) {
                 key={m}
                 sx={{
                   lineHeight: 0,
-                  animation: `${goldShine} 3.2s ease-in-out infinite`,
-                  animationDelay: `${i * 0.5}s`,
+                  animation: `${trophyGlow} 2s ease-in-out infinite`,
+                  animationDelay: `${i * 0.3}s`,
                 }}
               >
-                <Medal color="#D4A017" ribbonColor="#B03A2E" value={String(m)} unit="回" shine />
+                <Trophy value={String(m)} unit="回" />
               </Box>
             ))}
           </Box>
