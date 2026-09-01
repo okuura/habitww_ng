@@ -201,25 +201,56 @@ function Medal({ color, value, unit, year, ribbonColor, ongoing }: MedalProps) {
 }
 
 // --- Trophy (SVG) ----------------------------------------------------------
-// Gold cup for cumulative milestones: lip, bowl with handles, stem and
-// two-tier base. A specular streak sweeps the bowl every 2s (SMIL).
+// Championship cup for cumulative milestones. Polished-metal gradients with
+// cylindrical shading, S-curve handles, knopped stem, tiered base with a
+// plaque, a breathing golden halo behind it, twinkling sparkles, and a
+// specular sweep across the bowl. All animation is SMIL (works on iOS).
+
+const SPARKLE = 'M0,-4 Q0.9,-0.9 4,0 Q0.9,0.9 0,4 Q-0.9,0.9 -4,0 Q-0.9,-0.9 0,-4 Z';
+
+function Sparkle({ x, y, scale, begin, dur }: { x: number; y: number; scale: number; begin: string; dur: string }) {
+  return (
+    <g transform={`translate(${x} ${y}) scale(${scale})`}>
+      <path d={SPARKLE} fill="#FFFDE7" opacity={0}>
+        <animate attributeName="opacity" values="0;0.95;0" dur={dur} begin={begin} repeatCount="indefinite" />
+      </path>
+    </g>
+  );
+}
 
 function Trophy({ value, unit }: { value: string; unit: string }) {
   const gid = useId();
-  const valueSize = value.length >= 4 ? 9 : value.length === 3 ? 10.5 : 12;
-  const BOWL = 'M13 14 H35 V25 C35 34 30 39 24 39 C18 39 13 34 13 25 Z';
+  const valueSize = value.length >= 4 ? 9.5 : value.length === 3 ? 11 : 13;
+  const BOWL = 'M14 18 H42 V27 C42 39 35.5 45 28 45 C20.5 45 14 39 14 27 Z';
 
   return (
-    <svg width={40} height={52} viewBox="0 0 48 62" aria-hidden focusable="false">
+    <svg width={46} height={56} viewBox="0 0 56 68" aria-hidden focusable="false">
       <defs>
-        <linearGradient id={`${gid}-g`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#FFE082" />
-          <stop offset="55%" stopColor="#E6B31E" />
-          <stop offset="100%" stopColor="#8B6914" />
+        {/* Polished gold: bright crown, deep amber core, dark foot */}
+        <linearGradient id={`${gid}-v`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#FFF8DC" />
+          <stop offset="22%" stopColor="#FFD54F" />
+          <stop offset="55%" stopColor="#F0A500" />
+          <stop offset="82%" stopColor="#C07F0C" />
+          <stop offset="100%" stopColor="#8A5C08" />
         </linearGradient>
-        <linearGradient id={`${gid}-sh`} x1="0" y1="0" x2="1" y2="0">
+        {/* Mirror-band for lip / base tiers (light-dark-light polish) */}
+        <linearGradient id={`${gid}-h`} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#9A6B0A" />
+          <stop offset="22%" stopColor="#FFE082" />
+          <stop offset="50%" stopColor="#FFF3C4" />
+          <stop offset="78%" stopColor="#E0A81A" />
+          <stop offset="100%" stopColor="#8A5C08" />
+        </linearGradient>
+        {/* Halo behind the cup */}
+        <radialGradient id={`${gid}-halo`} cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="rgba(255,215,64,0.55)" />
+          <stop offset="55%" stopColor="rgba(255,200,40,0.22)" />
+          <stop offset="100%" stopColor="rgba(255,200,40,0)" />
+        </radialGradient>
+        <linearGradient id={`${gid}-sw`} x1="0" y1="0" x2="1" y2="0">
           <stop offset="0%" stopColor="rgba(255,255,255,0)" />
-          <stop offset="50%" stopColor="rgba(255,255,240,0.8)" />
+          <stop offset="50%" stopColor="rgba(255,255,245,0.85)" />
           <stop offset="100%" stopColor="rgba(255,255,255,0)" />
         </linearGradient>
         <clipPath id={`${gid}-cl`}>
@@ -227,31 +258,69 @@ function Trophy({ value, unit }: { value: string; unit: string }) {
         </clipPath>
       </defs>
 
-      {/* Handles */}
-      <path d="M13 16 C5 16 5 27 13.5 29" fill="none" stroke={`url(#${gid}-g)`} strokeWidth={3} strokeLinecap="round" />
-      <path d="M35 16 C43 16 43 27 34.5 29" fill="none" stroke={`url(#${gid}-g)`} strokeWidth={3} strokeLinecap="round" />
-      {/* Bowl + lip */}
-      <path d={BOWL} fill={`url(#${gid}-g)`} stroke="#7A5C0E" strokeWidth={1} />
-      <rect x={11} y={10} width={26} height={4.5} rx={2} fill={`url(#${gid}-g)`} stroke="#7A5C0E" strokeWidth={1} />
-      {/* Gloss */}
-      <ellipse cx={18.5} cy={20} rx={5.5} ry={2.8} fill="rgba(255,255,255,0.3)" transform="rotate(-22 18.5 20)" />
-      {/* Stem + base */}
-      <path d="M21.5 39 h5 l1.2 6.5 h-7.4 Z" fill={`url(#${gid}-g)`} stroke="#7A5C0E" strokeWidth={0.8} />
-      <rect x={16} y={45.5} width={16} height={3.5} rx={1} fill={`url(#${gid}-g)`} stroke="#7A5C0E" strokeWidth={0.8} />
-      <rect x={13} y={49} width={22} height={5} rx={1.5} fill={`url(#${gid}-g)`} stroke="#7A5C0E" strokeWidth={0.8} />
-      {/* Value engraved on the bowl */}
-      <text x={24} y={28} textAnchor="middle" fontWeight={800} fontSize={valueSize} fill="#fff">
-        {value}
-        <tspan fontSize={6.5} fontWeight={700}>{unit}</tspan>
+      {/* Breathing halo (always on, swells every 2s) */}
+      <circle cx={28} cy={32} r={27} fill={`url(#${gid}-halo)`}>
+        <animate attributeName="opacity" values="0.65;1;0.65" dur="2s" repeatCount="indefinite" />
+      </circle>
+
+      {/* Handles: S-curves with a bright inner accent */}
+      <path d="M14 20 C3.5 20 2.5 34 15 36.5" fill="none" stroke={`url(#${gid}-v)`} strokeWidth={3.6} strokeLinecap="round" />
+      <path d="M42 20 C52.5 20 53.5 34 41 36.5" fill="none" stroke={`url(#${gid}-v)`} strokeWidth={3.6} strokeLinecap="round" />
+      <path d="M14 20 C5 20 4.5 33 15 35.5" fill="none" stroke="rgba(255,248,220,0.55)" strokeWidth={1} strokeLinecap="round" />
+      <path d="M42 20 C51 20 51.5 33 41 35.5" fill="none" stroke="rgba(255,248,220,0.55)" strokeWidth={1} strokeLinecap="round" />
+
+      {/* Bowl with cylindrical shading */}
+      <path d={BOWL} fill={`url(#${gid}-v)`} stroke="#7A4F00" strokeWidth={1} />
+      <g clipPath={`url(#${gid}-cl)`}>
+        {/* left highlight column / right shade column */}
+        <path d="M17 18 h5 v27 h-5 Z" fill="rgba(255,255,255,0.32)" />
+        <path d="M36 18 h5 v27 h-5 Z" fill="rgba(90,50,0,0.22)" />
+        {/* inner shadow under the lip */}
+        <rect x={14} y={18} width={28} height={2.5} fill="rgba(90,50,0,0.28)" />
+      </g>
+
+      {/* Lip */}
+      <rect x={11.5} y={13} width={33} height={5.5} rx={2.75} fill={`url(#${gid}-h)`} stroke="#7A4F00" strokeWidth={1} />
+
+      {/* Engraved star above the number */}
+      <polygon
+        points="28,21.6 29.3,24.2 32.2,24.6 30.1,26.6 30.6,29.4 28,28.1 25.4,29.4 25.9,26.6 23.8,24.6 26.7,24.2"
+        fill="rgba(255,253,231,0.9)" stroke="rgba(122,79,0,0.5)" strokeWidth={0.4}
+      />
+
+      {/* Value: engraved (dark offset under white face) */}
+      <text x={28} y={39.2} textAnchor="middle" fontWeight={800} fontSize={valueSize} fill="rgba(110,65,0,0.8)">
+        {value}<tspan fontSize={7} fontWeight={700}>{unit}</tspan>
       </text>
-      {/* Specular sweep across the bowl, every 2s */}
+      <text x={28} y={38.5} textAnchor="middle" fontWeight={800} fontSize={valueSize} fill="#FFFFFF">
+        {value}<tspan fontSize={7} fontWeight={700}>{unit}</tspan>
+      </text>
+
+      {/* Knopped stem */}
+      <path d="M25.5 45 h5 v2.5 h-5 Z" fill={`url(#${gid}-v)`} stroke="#7A4F00" strokeWidth={0.7} />
+      <ellipse cx={28} cy={49.8} rx={4.6} ry={2.4} fill={`url(#${gid}-v)`} stroke="#7A4F00" strokeWidth={0.7} />
+      <path d="M25.5 51.8 h5 v3 h-5 Z" fill={`url(#${gid}-v)`} stroke="#7A4F00" strokeWidth={0.7} />
+
+      {/* Tiered base + plaque */}
+      <path d="M19 54.8 H37 L39.5 58.8 H16.5 Z" fill={`url(#${gid}-h)`} stroke="#7A4F00" strokeWidth={0.8} />
+      <rect x={13.5} y={58.8} width={29} height={6.5} rx={1.5} fill={`url(#${gid}-h)`} stroke="#7A4F00" strokeWidth={0.8} />
+      <rect x={20} y={60.3} width={16} height={3.6} rx={0.8} fill="#4E342E" stroke="#3E2723" strokeWidth={0.5} />
+      <rect x={21} y={61} width={14} height={0.8} rx={0.4} fill="rgba(255,235,180,0.35)" />
+
+      {/* Specular sweep across the bowl every 2s */}
       <g clipPath={`url(#${gid}-cl)`}>
         <g transform="skewX(-18)">
-          <rect y={12} width={10} height={30} fill={`url(#${gid}-sh)`}>
-            <animate attributeName="x" values="-20;68;68" keyTimes="0;0.45;1" dur="2s" repeatCount="indefinite" />
+          <rect y={16} width={11} height={32} fill={`url(#${gid}-sw)`}>
+            <animate attributeName="x" values="-22;76;76" keyTimes="0;0.4;1" dur="2s" repeatCount="indefinite" />
           </rect>
         </g>
       </g>
+
+      {/* Twinkling sparkles, staggered so the cup is never still */}
+      <Sparkle x={9} y={12} scale={1.1} begin="0s" dur="2s" />
+      <Sparkle x={47.5} y={26} scale={0.85} begin="0.7s" dur="2s" />
+      <Sparkle x={40} y={7} scale={1.3} begin="1.2s" dur="2s" />
+      <Sparkle x={12} y={42} scale={0.7} begin="1.6s" dur="2s" />
     </svg>
   );
 }
