@@ -4,7 +4,6 @@ import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
 import LinearProgress from '@mui/material/LinearProgress';
 import { alpha, darken, lighten } from '@mui/material/styles';
-import { keyframes } from '@emotion/react';
 import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
@@ -17,11 +16,6 @@ interface BadgesProps {
 
 const TOTAL_MILESTONES = [50, 100, 250, 500, 1000, 2000, 5000];
 
-// Trophy: constant golden halo, with the trophy itself flaring every 2s
-const trophyGlow = keyframes`
-  0%, 100% { filter: brightness(1) drop-shadow(0 0 4px rgba(255, 200, 0, 0.55)); }
-  50%      { filter: brightness(1.28) drop-shadow(0 0 9px rgba(255, 215, 0, 0.9)); }
-`;
 
 function toLocalDateString(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -238,7 +232,7 @@ function Trophy({ value, unit }: { value: string; unit: string }) {
         </radialGradient>
         <linearGradient id={`${gid}-sw`} x1="0" y1="0" x2="1" y2="0">
           <stop offset="0%" stopColor="rgba(255,255,255,0)" />
-          <stop offset="50%" stopColor="rgba(255,255,245,0.85)" />
+          <stop offset="50%" stopColor="rgba(255,255,245,0.55)" />
           <stop offset="100%" stopColor="rgba(255,255,255,0)" />
         </linearGradient>
         <clipPath id={`${gid}-cl`}>
@@ -246,9 +240,19 @@ function Trophy({ value, unit }: { value: string; unit: string }) {
         </clipPath>
       </defs>
 
-      {/* Breathing halo (always on, swells every 2s) */}
-      <circle cx={28} cy={32} r={27} fill={`url(#${gid}-halo)`}>
-        <animate attributeName="opacity" values="0.65;1;0.65" dur="2s" repeatCount="indefinite" />
+      {/* Soft breathing halo — the single source of the surrounding glow.
+          4s cycle, spline-eased, gently swelling in size and brightness. */}
+      <circle cx={28} cy={32} r={25} fill={`url(#${gid}-halo)`}>
+        <animate
+          attributeName="opacity" values="0.5;0.8;0.5" dur="4s"
+          calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"
+          repeatCount="indefinite"
+        />
+        <animate
+          attributeName="r" values="24;27;24" dur="4s"
+          calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"
+          repeatCount="indefinite"
+        />
       </circle>
 
       {/* Handles: S-curves with a bright inner accent */}
@@ -295,11 +299,11 @@ function Trophy({ value, unit }: { value: string; unit: string }) {
       <rect x={20} y={60.3} width={16} height={3.6} rx={0.8} fill="#4E342E" stroke="#3E2723" strokeWidth={0.5} />
       <rect x={21} y={61} width={14} height={0.8} rx={0.4} fill="rgba(255,235,180,0.35)" />
 
-      {/* Specular sweep across the bowl every 2s */}
+      {/* Gentle specular sweep across the bowl (~1.3s glide, 4s cycle) */}
       <g clipPath={`url(#${gid}-cl)`}>
         <g transform="skewX(-18)">
           <rect y={16} width={11} height={32} fill={`url(#${gid}-sw)`}>
-            <animate attributeName="x" values="-22;76;76" keyTimes="0;0.4;1" dur="2s" repeatCount="indefinite" />
+            <animate attributeName="x" values="-22;76;76" keyTimes="0;0.33;1" dur="4s" repeatCount="indefinite" />
           </rect>
         </g>
       </g>
@@ -407,15 +411,8 @@ export default function Badges({ habits, completions }: BadgesProps) {
           </Box>
 
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: milestones.next ? 1 : 0 }}>
-            {milestones.achieved.map((m, i) => (
-              <Box
-                key={m}
-                sx={{
-                  lineHeight: 0,
-                  animation: `${trophyGlow} 2s ease-in-out infinite`,
-                  animationDelay: `${i * 0.3}s`,
-                }}
-              >
+            {milestones.achieved.map(m => (
+              <Box key={m} sx={{ lineHeight: 0 }}>
                 <Trophy value={String(m)} unit="回" />
               </Box>
             ))}
