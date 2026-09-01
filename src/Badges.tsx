@@ -203,20 +203,8 @@ function Medal({ color, value, unit, year, ribbonColor, ongoing }: MedalProps) {
 // --- Trophy (SVG) ----------------------------------------------------------
 // Championship cup for cumulative milestones. Polished-metal gradients with
 // cylindrical shading, S-curve handles, knopped stem, tiered base with a
-// plaque, a breathing golden halo behind it, twinkling sparkles, and a
-// specular sweep across the bowl. All animation is SMIL (works on iOS).
-
-const SPARKLE = 'M0,-4 Q0.9,-0.9 4,0 Q0.9,0.9 0,4 Q-0.9,0.9 -4,0 Q-0.9,-0.9 0,-4 Z';
-
-function Sparkle({ x, y, scale, begin, dur }: { x: number; y: number; scale: number; begin: string; dur: string }) {
-  return (
-    <g transform={`translate(${x} ${y}) scale(${scale})`}>
-      <path d={SPARKLE} fill="#FFFDE7" opacity={0}>
-        <animate attributeName="opacity" values="0;0.95;0" dur={dur} begin={begin} repeatCount="indefinite" />
-      </path>
-    </g>
-  );
-}
+// plaque, a breathing golden halo behind it, and a specular sweep across
+// the bowl. All animation is SMIL (works on iOS).
 
 function Trophy({ value, unit }: { value: string; unit: string }) {
   const gid = useId();
@@ -315,12 +303,6 @@ function Trophy({ value, unit }: { value: string; unit: string }) {
           </rect>
         </g>
       </g>
-
-      {/* Twinkling sparkles, staggered so the cup is never still */}
-      <Sparkle x={9} y={12} scale={1.1} begin="0s" dur="2s" />
-      <Sparkle x={47.5} y={26} scale={0.85} begin="0.7s" dur="2s" />
-      <Sparkle x={40} y={7} scale={1.3} begin="1.2s" dur="2s" />
-      <Sparkle x={12} y={42} scale={0.7} begin="1.6s" dur="2s" />
     </svg>
   );
 }
