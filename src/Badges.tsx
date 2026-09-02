@@ -230,6 +230,12 @@ function Trophy({ value, unit }: { value: string; unit: string }) {
           <stop offset="55%" stopColor="rgba(255,200,40,0.22)" />
           <stop offset="100%" stopColor="rgba(255,200,40,0)" />
         </radialGradient>
+        {/* Rays fade to nothing well inside the viewBox so rotation never clips */}
+        <radialGradient id={`${gid}-ray`} gradientUnits="userSpaceOnUse" cx="28" cy="32" r="26">
+          <stop offset="0%" stopColor="rgba(255,223,110,0.4)" />
+          <stop offset="45%" stopColor="rgba(255,210,80,0.18)" />
+          <stop offset="100%" stopColor="rgba(255,210,80,0)" />
+        </radialGradient>
         <linearGradient id={`${gid}-sw`} x1="0" y1="0" x2="1" y2="0">
           <stop offset="0%" stopColor="rgba(255,255,255,0)" />
           <stop offset="50%" stopColor="rgba(255,255,245,0.55)" />
@@ -244,7 +250,7 @@ function Trophy({ value, unit }: { value: string; unit: string }) {
           4s cycle, spline-eased, gently swelling in size and brightness. */}
       <circle cx={28} cy={32} r={25} fill={`url(#${gid}-halo)`}>
         <animate
-          attributeName="opacity" values="0.5;0.8;0.5" dur="4s"
+          attributeName="opacity" values="0.65;0.9;0.65" dur="5s"
           calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"
           repeatCount="indefinite"
         />
@@ -254,6 +260,25 @@ function Trophy({ value, unit }: { value: string; unit: string }) {
           repeatCount="indefinite"
         />
       </circle>
+
+      {/* Radiance: faint tapered rays revolving imperceptibly slowly (36s/turn).
+          Alternating long/short rays; the radial gradient melts them into air. */}
+      <g opacity={0.7}>
+        <g>
+          <animateTransform
+            attributeName="transform" type="rotate"
+            from="0 28 32" to="360 28 32" dur="36s" repeatCount="indefinite"
+          />
+          {[0, 45, 90, 135, 180, 225, 270, 315].map(deg => (
+            <path
+              key={deg}
+              d={deg % 90 === 0 ? 'M28 32 L26.6 6.5 L29.4 6.5 Z' : 'M28 32 L26.9 12.5 L29.1 12.5 Z'}
+              fill={`url(#${gid}-ray)`}
+              transform={`rotate(${deg} 28 32)`}
+            />
+          ))}
+        </g>
+      </g>
 
       {/* Handles: S-curves with a bright inner accent */}
       <path d="M14 20 C3.5 20 2.5 34 15 36.5" fill="none" stroke={`url(#${gid}-v)`} strokeWidth={3.6} strokeLinecap="round" />
