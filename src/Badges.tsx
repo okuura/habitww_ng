@@ -226,14 +226,14 @@ function Trophy({ value, unit }: { value: string; unit: string }) {
         </linearGradient>
         {/* Halo behind the cup */}
         <radialGradient id={`${gid}-halo`} cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="rgba(255,215,64,0.55)" />
-          <stop offset="55%" stopColor="rgba(255,200,40,0.22)" />
+          <stop offset="0%" stopColor="rgba(255,215,64,0.8)" />
+          <stop offset="55%" stopColor="rgba(255,200,40,0.35)" />
           <stop offset="100%" stopColor="rgba(255,200,40,0)" />
         </radialGradient>
         {/* Rays fade to nothing well inside the viewBox so rotation never clips */}
         <radialGradient id={`${gid}-ray`} gradientUnits="userSpaceOnUse" cx="28" cy="32" r="26">
-          <stop offset="0%" stopColor="rgba(255,223,110,0.4)" />
-          <stop offset="45%" stopColor="rgba(255,210,80,0.18)" />
+          <stop offset="0%" stopColor="rgba(255,225,120,0.75)" />
+          <stop offset="50%" stopColor="rgba(255,212,85,0.4)" />
           <stop offset="100%" stopColor="rgba(255,210,80,0)" />
         </radialGradient>
         <linearGradient id={`${gid}-sw`} x1="0" y1="0" x2="1" y2="0">
@@ -250,7 +250,7 @@ function Trophy({ value, unit }: { value: string; unit: string }) {
           4s cycle, spline-eased, gently swelling in size and brightness. */}
       <circle cx={28} cy={32} r={25} fill={`url(#${gid}-halo)`}>
         <animate
-          attributeName="opacity" values="0.65;0.9;0.65" dur="5s"
+          attributeName="opacity" values="0.75;1;0.75" dur="5s"
           calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"
           repeatCount="indefinite"
         />
@@ -263,16 +263,16 @@ function Trophy({ value, unit }: { value: string; unit: string }) {
 
       {/* Radiance: faint tapered rays revolving imperceptibly slowly (36s/turn).
           Alternating long/short rays; the radial gradient melts them into air. */}
-      <g opacity={0.7}>
+      <g opacity={0.9}>
         <g>
           <animateTransform
             attributeName="transform" type="rotate"
-            from="0 28 32" to="360 28 32" dur="36s" repeatCount="indefinite"
+            from="0 28 32" to="360 28 32" dur="22s" repeatCount="indefinite"
           />
           {[0, 45, 90, 135, 180, 225, 270, 315].map(deg => (
             <path
               key={deg}
-              d={deg % 90 === 0 ? 'M28 32 L26.6 6.5 L29.4 6.5 Z' : 'M28 32 L26.9 12.5 L29.1 12.5 Z'}
+              d={deg % 90 === 0 ? 'M28 32 L25.8 5.5 L30.2 5.5 Z' : 'M28 32 L26.4 11.5 L29.6 11.5 Z'}
               fill={`url(#${gid}-ray)`}
               transform={`rotate(${deg} 28 32)`}
             />
