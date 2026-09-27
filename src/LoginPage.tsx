@@ -57,7 +57,17 @@ export default function LoginPage() {
           <CalendarTodayIcon sx={{ fontSize: 36, color: 'primary.main' }} />
         </Box>
 
-        <Typography variant="h5" sx={{ fontWeight: 800, color: 'text.primary', mb: 1 }}>
+        <Typography
+          variant="h5"
+          sx={{
+            fontFamily: '"Fredoka", "Roboto", sans-serif',
+            fontWeight: 700,
+            letterSpacing: 0.5,
+            fontSize: '2rem',
+            color: 'primary.main',
+            mb: 1,
+          }}
+        >
           Habitww
         </Typography>
         <Typography variant="body2" sx={{ color: 'text.secondary', mb: 4, lineHeight: 1.6 }}>

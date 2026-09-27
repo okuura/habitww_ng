@@ -585,7 +585,20 @@ function AppContent() {
       <AppBar position="sticky" elevation={0} sx={{ bgcolor: 'background.paper', borderBottom: 1, borderColor: 'divider' }}>
         <Toolbar>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.primary', fontSize: { xs: '1rem', sm: '1.25rem' } }}>
+            <Typography
+              variant="h6"
+              sx={{
+                fontFamily: '"Fredoka", "Roboto", sans-serif',
+                fontWeight: 700,
+                letterSpacing: 0.4,
+                fontSize: { xs: '1.3rem', sm: '1.55rem' },
+                lineHeight: 1,
+                background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${lighten(theme.palette.primary.main, 0.35)} 100%)`,
+                WebkitBackgroundClip: 'text',
+                backgroundClip: 'text',
+                color: 'transparent',
+              }}
+            >
               {page === 'habits' ? 'Habitww' : page === 'stats' ? 'Habits Insight' : 'Share Habits'}
             </Typography>
           </Box>

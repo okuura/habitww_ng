@@ -7,6 +7,8 @@ import '@fontsource/roboto/latin-300.css';
 import '@fontsource/roboto/latin-400.css';
 import '@fontsource/roboto/latin-500.css';
 import '@fontsource/roboto/latin-700.css';
+// Display font for the app title only (rounded, playful)
+import '@fontsource/fredoka/latin-700.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
