@@ -709,6 +709,10 @@ function AppContent() {
                   const totalCount = datesSet.size;
                   const isShared = myShares.has(habit.id);
 
+                  const paperBg =
+                    (mode === 'dark' ? theme.colorSchemes?.dark : theme.colorSchemes?.light)
+                      ?.palette.background.paper ?? theme.palette.background.paper;
+
                   return (
                     <Card
                       key={habit.id}
@@ -724,7 +728,7 @@ function AppContent() {
                         // Level 2: the card frame flows with the same rainbow as the button
                         ...(currentIntensity === 2 ? {
                           border: '2px solid transparent',
-                          background: `linear-gradient(${theme.palette.background.paper}, ${theme.palette.background.paper}) padding-box, ${RAINBOW} border-box`,
+                          background: `linear-gradient(${paperBg}, ${paperBg}) padding-box, ${RAINBOW} border-box`,
                           backgroundSize: '100% 100%, 300% 100%',
                           animation: `${rainbowShift} 3s linear infinite`,
                           boxShadow: mode === 'dark'
