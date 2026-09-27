@@ -240,6 +240,16 @@ function calculateStreak(completedDates: Set<string>): number {
   return streak;
 }
 
+// theme.palette is the light scheme when colorSchemes are configured, so a
+// per-mode lookup is needed for anything painted from JS (not via sx tokens).
+// colorSchemes is populated at runtime but absent from the Theme type.
+function paperColorFor(scheme: 'light' | 'dark'): string {
+  const schemes = (theme as unknown as {
+    colorSchemes?: Partial<Record<'light' | 'dark', { palette: { background: { paper: string } } }>>;
+  }).colorSchemes;
+  return schemes?.[scheme]?.palette.background.paper ?? theme.palette.background.paper;
+}
+
 export default function App() {
   return (
     <ThemeProvider theme={theme} defaultMode="system" noSsr>
@@ -709,9 +719,7 @@ function AppContent() {
                   const totalCount = datesSet.size;
                   const isShared = myShares.has(habit.id);
 
-                  const paperBg =
-                    (mode === 'dark' ? theme.colorSchemes?.dark : theme.colorSchemes?.light)
-                      ?.palette.background.paper ?? theme.palette.background.paper;
+                  const paperBg = paperColorFor(mode === 'dark' ? 'dark' : 'light');
 
                   return (
                     <Card
