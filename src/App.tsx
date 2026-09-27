@@ -87,51 +87,6 @@ function getStdColorDark(hex: string): string {
   if (c === '#ff9800') return '#DF8B16';
   return hex;
 }
-function getHighColorDark(hex: string): string {
-  const c = hex.toLowerCase();
-  if (c === '#5e9e22') return '#85F55C';
-  if (c === '#2196f3') return '#6FB0F7';
-  if (c === '#ff9800') return '#FAC978';
-  // General fallback: boost saturation +15pt (cap 100%), lightness +5pt
-  const r = parseInt(hex.slice(1, 3), 16) / 255;
-  const g = parseInt(hex.slice(3, 5), 16) / 255;
-  const b = parseInt(hex.slice(5, 7), 16) / 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
-  const l = (max + min) / 2;
-  const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
-  let h = 0;
-  if (d > 0) {
-    if (max === r) h = (((g - b) / d) % 6 + 6) % 6;
-    else if (max === g) h = (b - r) / d + 2;
-    else h = (r - g) / d + 4;
-    h *= 60;
-  }
-  const ns = Math.min(s + 0.15, 1);
-  const nl = Math.min(l + 0.05, 0.9);
-  const cv = (1 - Math.abs(2 * nl - 1)) * ns;
-  const x = cv * (1 - Math.abs((h / 60) % 2 - 1));
-  const m = nl - cv / 2;
-  let r1 = 0, g1 = 0, b1 = 0;
-  const sec = Math.floor(h / 60) % 6;
-  if (sec === 0) { r1 = cv; g1 = x; }
-  else if (sec === 1) { r1 = x; g1 = cv; }
-  else if (sec === 2) { g1 = cv; b1 = x; }
-  else if (sec === 3) { g1 = x; b1 = cv; }
-  else if (sec === 4) { r1 = x; b1 = cv; }
-  else { r1 = cv; b1 = x; }
-  const toHex = (n: number) => Math.round((n + m) * 255).toString(16).padStart(2, '0');
-  return `#${toHex(r1)}${toHex(g1)}${toHex(b1)}`;
-}
-
-// Dark mode top button text color (ensures WCAG AA contrast on the vivid bg).
-function getHighTextColorDark(hex: string): string | undefined {
-  const c = hex.toLowerCase();
-  if (c === '#5e9e22') return '#0A2A02';
-  if (c === '#2196f3') return '#04182E';
-  if (c === '#ff9800') return '#2E1902';
-  return undefined;
-}
-
 const confettiBurst = keyframes`
   0%   { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
   80%  { opacity: 0.8; }
@@ -145,6 +100,28 @@ const bounceIn = keyframes`
   80%  { transform: scale(1.02); }
   100% { transform: scale(1); }
 `;
+
+const rainbowShift = keyframes`
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 300% 50%; }
+`;
+
+const confettiFall = keyframes`
+  0%   { transform: translate3d(0, -12vh, 0) rotate(0deg); opacity: 1; }
+  100% { transform: translate3d(var(--drift), 110vh, 0) rotate(var(--spin)); opacity: 0.9; }
+`;
+
+const feverBannerIn = keyframes`
+  0%   { transform: scale(0.6); opacity: 0; }
+  15%  { transform: scale(1.08); opacity: 1; }
+  25%  { transform: scale(1); }
+  80%  { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.05); opacity: 0; }
+`;
+
+const RAINBOW = 'linear-gradient(90deg, #ff5f6d, #ffc371, #f9f871, #7cf29c, #5ad1ff, #a18cff, #ff7ad9, #ff5f6d)';
+const FEVER_MS = 3200;
+const FEVER_PIECES = 48;
 
 const CONFETTI_CONFIGS = [
   { dx: '-55px', dy: '-90px', rot: '-120deg', delay: '0ms',   shape: 'circle' },
@@ -161,11 +138,11 @@ const CONFETTI_CONFIGS = [
   { dx: '60px',  dy: '-40px',  rot: '170deg', delay: '25ms',  shape: 'square' },
 ];
 
-function ConfettiBurst({ color }: { color: string }) {
+function ConfettiBurst({ color, count = CONFETTI_CONFIGS.length }: { color: string; count?: number }) {
   const colors = [lighten(color, 0.4), color, darken(color, 0.3), lighten(color, 0.6)];
   return (
     <Box sx={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'visible', zIndex: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      {CONFETTI_CONFIGS.map((cfg, i) => (
+      {CONFETTI_CONFIGS.slice(0, count).map((cfg, i) => (
         <Box
           key={i}
           sx={{
@@ -181,6 +158,63 @@ function ConfettiBurst({ color }: { color: string }) {
           } as object}
         />
       ))}
+    </Box>
+  );
+}
+
+// Full-screen celebration when every habit is done for today:
+// confetti rain in the habit colors + a rainbow "ALL CLEAR!" banner.
+function FeverOverlay({ colors }: { colors: string[] }) {
+  const [pieces] = useState(() =>
+    Array.from({ length: FEVER_PIECES }, (_, i) => ({
+      left: Math.random() * 100,
+      delay: Math.random() * 1.2,
+      dur: 2.2 + Math.random() * 1.2,
+      size: 7 + Math.random() * 7,
+      drift: `${(Math.random() - 0.5) * 30}vw`,
+      spin: `${Math.round((Math.random() - 0.5) * 1440)}deg`,
+      color: colors.length ? colors[i % colors.length] : '#4caf50',
+      round: Math.random() < 0.4,
+    })),
+  );
+  return (
+    <Box sx={{ position: 'fixed', inset: 0, zIndex: 1400, pointerEvents: 'none', overflow: 'hidden' }}>
+      {pieces.map((p, i) => (
+        <Box
+          key={i}
+          sx={{
+            position: 'absolute', top: 0, left: `${p.left}%`,
+            width: p.size, height: p.round ? p.size : p.size * 0.6,
+            bgcolor: p.color, borderRadius: p.round ? '50%' : '2px',
+            '--drift': p.drift, '--spin': p.spin,
+            animation: `${confettiFall} ${p.dur}s ${p.delay}s cubic-bezier(0.25, 0.6, 0.4, 1) both`,
+          } as object}
+        />
+      ))}
+      <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
+        <Box
+          sx={{
+            px: 3, py: 2, borderRadius: 4, textAlign: 'center',
+            bgcolor: 'rgba(0,0,0,0.58)', backdropFilter: 'blur(6px)',
+            boxShadow: '0 0 40px rgba(255,255,255,0.25)',
+            animation: `${feverBannerIn} ${FEVER_MS}ms ease-out forwards`,
+          }}
+        >
+          <Typography
+            sx={{
+              fontWeight: 900, fontSize: { xs: '2.2rem', sm: '2.8rem' }, lineHeight: 1.1, letterSpacing: 1,
+              background: RAINBOW, backgroundSize: '300% 100%',
+              WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
+              animation: `${rainbowShift} 2s linear infinite`,
+            }}
+          >
+            ALL CLEAR!
+          </Typography>
+          <Typography sx={{ color: '#fff', fontWeight: 700, mt: 0.5, fontSize: '1rem' }}>
+            今日の習慣、全部やりきった 🎉
+          </Typography>
+        </Box>
+      </Box>
     </Box>
   );
 }
@@ -227,7 +261,8 @@ function AppContent() {
   const [newHabitColor, setNewHabitColor] = useState(HABIT_COLORS[0]);
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState<string | null>(null);
-  const [celebratingHabitId, setCelebratingHabitId] = useState<string | null>(null);
+  const [celebrating, setCelebrating] = useState<{ id: string; level: 1 | 2 } | null>(null);
+  const [fever, setFever] = useState(false);
   const [accountMenuAnchor, setAccountMenuAnchor] = useState<null | HTMLElement>(null);
   const [deleteAccountDialogOpen, setDeleteAccountDialogOpen] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
@@ -407,6 +442,23 @@ function AppContent() {
     // 2-level cycle: 0(未実施) → 1(達成) → 2(ばっちり達成) → 0
     const nextIntensity = current >= 2 ? 0 : current + 1;
 
+    const wasAllDone = habits.length > 0 && habits.every(h => completedToday.has(h.id));
+    const willBeAllDone = habits.length > 0 && nextIntensity > 0
+      && habits.every(h => h.id === habit.id || completedToday.has(h.id));
+
+    // Feedback fires immediately on tap — never wait for the network
+    const canVibrate = typeof navigator !== 'undefined' && !!navigator.vibrate;
+    if (nextIntensity > 0) {
+      if (canVibrate) navigator.vibrate(nextIntensity === 2 ? [80, 30, 80, 30, 120] : 40);
+      setCelebrating({ id: habit.id, level: nextIntensity === 2 ? 2 : 1 });
+      setTimeout(() => setCelebrating(null), nextIntensity === 2 ? 1600 : 1100);
+    }
+    if (!wasAllDone && willBeAllDone) {
+      if (canVibrate) navigator.vibrate([60, 40, 60, 40, 60, 40, 220]);
+      setFever(true);
+      setTimeout(() => setFever(false), FEVER_MS);
+    }
+
     // Optimistic update for instant UI feedback
     setCompletions(prev => {
       const next = prev.filter(c => !(c.habit_id === habit.id && c.completed_date === todayStr));
@@ -438,14 +490,6 @@ function AppContent() {
         .update({ intensity: nextIntensity })
         .eq('habit_id', habit.id)
         .eq('completed_date', todayStr);
-    }
-
-    if (nextIntensity === 2) {
-      if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        navigator.vibrate([80, 30, 80, 30, 120]);
-      }
-      setCelebratingHabitId(habit.id);
-      setTimeout(() => setCelebratingHabitId(null), 1600);
     }
 
     setToggling(null);
@@ -537,6 +581,7 @@ function AppContent() {
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+      {fever && <FeverOverlay colors={habits.map(h => h.color)} />}
       <AppBar position="sticky" elevation={0} sx={{ bgcolor: 'background.paper', borderBottom: 1, borderColor: 'divider' }}>
         <Toolbar>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1 }}>
@@ -549,7 +594,14 @@ function AppContent() {
               label={`${completedCount} / ${habits.length} 完了`}
               color={completedCount === habits.length ? 'primary' : 'default'}
               size="small"
-              sx={{ fontWeight: 600, mr: 1 }}
+              sx={{
+                fontWeight: 600, mr: 1,
+                ...(completedCount === habits.length ? {
+                  background: RAINBOW, backgroundSize: '300% 100%', color: '#fff',
+                  textShadow: '0 1px 1px rgba(0,0,0,0.35)',
+                  animation: `${rainbowShift} 3s linear infinite`,
+                } : {}),
+              }}
             />
           )}
           <IconButton size="small" onClick={e => setAccountMenuAnchor(e.currentTarget)} sx={{ p: 0.5 }}>
@@ -754,17 +806,15 @@ function AppContent() {
                       </CardContent>
 
                       <CardActions sx={{ px: 2, pb: 1.5, pt: 0.5, position: 'relative' }}>
-                        {celebratingHabitId === habit.id && <ConfettiBurst color={habit.color} />}
+                        {celebrating?.id === habit.id && (
+                          <ConfettiBurst color={habit.color} count={celebrating.level === 2 ? CONFETTI_CONFIGS.length : 6} />
+                        )}
                         {(() => {
-                          const isCelebrating = celebratingHabitId === habit.id;
+                          const isCelebrating = celebrating?.id === habit.id;
                           const isDark = mode === 'dark';
 
                           // Same color logic as ActivityGrid getCellBg
                           const stdBg = isDark ? getStdColorDark(habit.color) : habit.color;
-                          const highBg = isDark ? getHighColorDark(habit.color) : darken(habit.color, 0.48);
-                          const highTextColor = isDark
-                            ? (getHighTextColorDark(habit.color) ?? theme.palette.getContrastText(highBg))
-                            : theme.palette.getContrastText(highBg);
 
                           const fireIcon = <LocalFireDepartmentIcon fontSize="small" />;
 
@@ -787,6 +837,7 @@ function AppContent() {
                               sx: {
                                 bgcolor: stdBg,
                                 color: theme.palette.getContrastText(stdBg),
+                                animation: isCelebrating ? `${bounceIn} 0.5s ease-out` : undefined,
                                 '&:hover': { bgcolor: isDark ? lighten(stdBg, 0.06) : darken(stdBg, 0.06) },
                               },
                             },
@@ -800,11 +851,20 @@ function AppContent() {
                               label: 'ばっちり達成！',
                               large: true,
                               sx: {
-                                bgcolor: highBg,
-                                color: highTextColor,
+                                background: RAINBOW,
+                                backgroundSize: '300% 100%',
+                                color: '#fff',
+                                textShadow: '0 1px 2px rgba(0,0,0,0.45)',
                                 fontWeight: 800,
-                                animation: isCelebrating ? `${bounceIn} 0.5s ease-out` : undefined,
-                                '&:hover': { bgcolor: isDark ? lighten(highBg, 0.06) : darken(highBg, 0.06) },
+                                boxShadow: isDark
+                                  ? '0 0 16px rgba(255,255,255,0.22), 0 2px 10px rgba(0,0,0,0.35)'
+                                  : '0 2px 12px rgba(0,0,0,0.22)',
+                                animation: isCelebrating
+                                  ? `${rainbowShift} 3s linear infinite, ${bounceIn} 0.5s ease-out`
+                                  : `${rainbowShift} 3s linear infinite`,
+                                '& .MuiButton-startIcon': { filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.4))' },
+                                '&:hover': { background: RAINBOW, backgroundSize: '300% 100%', filter: 'brightness(1.08)' },
+                                '&.Mui-disabled': { background: RAINBOW, backgroundSize: '300% 100%', color: '#fff', opacity: 0.85 },
                               },
                             },
                           ];
