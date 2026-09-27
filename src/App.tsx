@@ -593,10 +593,7 @@ function AppContent() {
                 letterSpacing: 0.4,
                 fontSize: { xs: '1.3rem', sm: '1.55rem' },
                 lineHeight: 1,
-                background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${lighten(theme.palette.primary.main, 0.35)} 100%)`,
-                WebkitBackgroundClip: 'text',
-                backgroundClip: 'text',
-                color: 'transparent',
+                color: mode === 'dark' ? '#fff' : 'primary.main',
               }}
             >
               {page === 'habits' ? 'Habitww' : page === 'stats' ? 'Habits Insight' : 'Share Habits'}
@@ -724,6 +721,16 @@ function AppContent() {
                           duration: theme.transitions.duration.shorter,
                         }),
                         boxShadow: currentIntensity === 0 ? 'none' : `0 0 0 ${currentIntensity + 1}px ${alpha(habit.color, currentIntensity * 0.08)}`,
+                        // Level 2: the card frame flows with the same rainbow as the button
+                        ...(currentIntensity === 2 ? {
+                          border: '2px solid transparent',
+                          background: `linear-gradient(${theme.palette.background.paper}, ${theme.palette.background.paper}) padding-box, ${RAINBOW} border-box`,
+                          backgroundSize: '100% 100%, 300% 100%',
+                          animation: `${rainbowShift} 3s linear infinite`,
+                          boxShadow: mode === 'dark'
+                            ? '0 0 14px rgba(255,255,255,0.14)'
+                            : '0 2px 14px rgba(0,0,0,0.14)',
+                        } : {}),
                       }}
                     >
                       <CardContent sx={{ pb: 0.5, pt: 1.5, px: 2 }}>
