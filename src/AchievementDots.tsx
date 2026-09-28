@@ -32,19 +32,81 @@ const hueSpin = keyframes`
   to   { filter: hue-rotate(360deg); }
 `;
 
+// --- Cheer motion patterns (picked at random per popup) ------------------
+// All use --rot (tilt) and --dx (sideways drift) custom properties.
 const cheerFloat = keyframes`
   0%   { transform: translate(-50%, 0) scale(0.4) rotate(var(--rot)); opacity: 0; }
   15%  { transform: translate(-50%, -10px) scale(1.18) rotate(var(--rot)); opacity: 1; }
   30%  { transform: translate(-50%, -16px) scale(1) rotate(var(--rot)); opacity: 1; }
-  100% { transform: translate(-50%, -76px) scale(1) rotate(var(--rot)); opacity: 0; }
+  100% { transform: translate(calc(-50% + var(--dx)), -80px) scale(1) rotate(var(--rot)); opacity: 0; }
 `;
+const cheerPop = keyframes`
+  0%   { transform: translate(-50%, 0) scale(0); opacity: 0; }
+  20%  { transform: translate(-50%, 0) scale(1.45) rotate(var(--rot)); opacity: 1; }
+  35%  { transform: translate(-50%, 0) scale(0.9) rotate(calc(var(--rot) * -1)); }
+  50%  { transform: translate(-50%, 0) scale(1.1) rotate(var(--rot)); }
+  80%  { transform: translate(-50%, -6px) scale(1) rotate(0deg); opacity: 1; }
+  100% { transform: translate(-50%, -14px) scale(0.6); opacity: 0; }
+`;
+const cheerRocket = keyframes`
+  0%   { transform: translate(-50%, 40px) scale(0.6) rotate(var(--rot)); opacity: 0; }
+  10%  { opacity: 1; }
+  60%  { transform: translate(calc(-50% + var(--dx)), -70px) scale(1.15) rotate(var(--rot)); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx) * 1.5), -120px) scale(1.2) rotate(var(--rot)); opacity: 0; }
+`;
+const cheerArc = keyframes`
+  0%   { transform: translate(-50%, 0) scale(0.5) rotate(0deg); opacity: 0; }
+  20%  { transform: translate(calc(-50% + var(--dx) * 0.4), -30px) scale(1.2) rotate(var(--rot)); opacity: 1; }
+  60%  { transform: translate(calc(-50% + var(--dx)), -40px) scale(1) rotate(calc(var(--rot) * 2)); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx) * 1.4), 10px) scale(0.9) rotate(calc(var(--rot) * 3)); opacity: 0; }
+`;
+const cheerSpin = keyframes`
+  0%   { transform: translate(-50%, 0) scale(0.2) rotate(-180deg); opacity: 0; }
+  35%  { transform: translate(-50%, -12px) scale(1.3) rotate(10deg); opacity: 1; }
+  55%  { transform: translate(-50%, -16px) scale(1) rotate(-6deg); }
+  100% { transform: translate(-50%, -50px) scale(1) rotate(360deg); opacity: 0; }
+`;
+const cheerBoom = keyframes`
+  0%   { transform: translate(-50%, 0) scale(2.6) rotate(var(--rot)); opacity: 0; filter: blur(2px); }
+  25%  { transform: translate(-50%, 0) scale(1) rotate(0deg); opacity: 1; filter: blur(0); }
+  40%  { transform: translate(-50%, 0) scale(1.15) rotate(0deg); }
+  75%  { transform: translate(-50%, 0) scale(1) rotate(0deg); opacity: 1; }
+  100% { transform: translate(-50%, -20px) scale(1.2) rotate(0deg); opacity: 0; }
+`;
+const cheerJelly = keyframes`
+  0%   { transform: translate(-50%, 0) scale(0.6, 1.4); opacity: 0; }
+  15%  { transform: translate(-50%, 0) scale(1.35, 0.75); opacity: 1; }
+  30%  { transform: translate(-50%, 0) scale(0.85, 1.2); }
+  45%  { transform: translate(-50%, 0) scale(1.12, 0.92); }
+  60%  { transform: translate(-50%, 0) scale(0.97, 1.05); }
+  75%  { transform: translate(-50%, 0) scale(1, 1); opacity: 1; }
+  100% { transform: translate(-50%, -30px) scale(1, 1); opacity: 0; }
+`;
+const cheerDrop = keyframes`
+  0%   { transform: translate(-50%, -70px) scale(0.8) rotate(var(--rot)); opacity: 0; }
+  35%  { transform: translate(-50%, 8px) scale(1.1, 0.85) rotate(0deg); opacity: 1; }
+  50%  { transform: translate(-50%, -14px) scale(0.95, 1.1) rotate(0deg); }
+  65%  { transform: translate(-50%, 0) scale(1.05, 0.95) rotate(0deg); }
+  80%  { transform: translate(-50%, -4px) scale(1) rotate(0deg); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx)), -4px) scale(1) rotate(var(--rot)); opacity: 0; }
+`;
+const CHEER_PATTERNS = [
+  { kf: cheerFloat,  ms: 1700 },
+  { kf: cheerPop,    ms: 1500 },
+  { kf: cheerRocket, ms: 1400 },
+  { kf: cheerArc,    ms: 1800 },
+  { kf: cheerSpin,   ms: 1600 },
+  { kf: cheerBoom,   ms: 1500 },
+  { kf: cheerJelly,  ms: 1600 },
+  { kf: cheerDrop,   ms: 1700 },
+];
 
-const CHEER_WORDS = ['よくやった！', 'がんばった！', 'すごい！', 'えらい！', 'その調子！', '最高！', '継続は力！', '天才！', 'ナイス！', 'やるじゃん！'];
-const CHEER_EMOJI = ['🎉', '👏', '🔥', '✨', '💪', '🏆', '🌈', '⭐', '🎊', '🙌'];
+const CHEER_WORDS = ['よくやった！', 'がんばった！', 'すごい！', 'えらい！', 'その調子！', '最高！', '継続は力！', '天才！', 'ナイス！', 'やるじゃん！', 'ブラボー！', 'キタ！', '神！', 'つよい！'];
+const CHEER_EMOJI = ['🎉', '👏', '🔥', '✨', '💪', '🏆', '🌈', '⭐', '🎊', '🙌', '💯', '🚀', '🥳', '👑'];
 const CHEER_COLORS = ['#ff5f6d', '#ffb347', '#7cf29c', '#5ad1ff', '#a18cff', '#ff7ad9', '#f9d423'];
-const CHEER_INTERVAL_MS = 650;
-const CHEER_LIFE_MS = 1700;
-const CHEER_MAX = 8;
+const CHEER_INTERVAL_MS = 380;
+const CHEER_BURST_CHANCE = 0.22; // sometimes 2–4 pop at once
+const CHEER_MAX = 10;
 
 function toLocalDateString(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -57,7 +119,10 @@ interface Cheer {
   text: string;
   color: string;
   rot: number;
+  dx: number;
+  size: number;
   emoji: boolean;
+  pattern: number;
 }
 
 // Words of praise and party emoji popping up at random spots, for as long
@@ -67,22 +132,31 @@ function CheerPopups() {
 
   useEffect(() => {
     let nextId = 0;
-    const spawn = () => {
+    const spawnOne = () => {
       const emoji = Math.random() < 0.4;
       const pool = emoji ? CHEER_EMOJI : CHEER_WORDS;
+      const pattern = Math.floor(Math.random() * CHEER_PATTERNS.length);
       const item: Cheer = {
         id: nextId++,
         x: 8 + Math.random() * 84,
-        y: 20 + Math.random() * 65,
+        y: 15 + Math.random() * 70,
         text: pool[Math.floor(Math.random() * pool.length)],
         color: CHEER_COLORS[Math.floor(Math.random() * CHEER_COLORS.length)],
-        rot: (Math.random() - 0.5) * 26,
+        rot: (Math.random() - 0.5) * 30,
+        dx: (Math.random() - 0.5) * 90,
+        size: 0.8 + Math.random() * 0.6,
         emoji,
+        pattern,
       };
       setItems(prev => [...prev.slice(-(CHEER_MAX - 1)), item]);
-      setTimeout(() => setItems(prev => prev.filter(p => p.id !== item.id)), CHEER_LIFE_MS);
+      setTimeout(() => setItems(prev => prev.filter(p => p.id !== item.id)), CHEER_PATTERNS[pattern].ms);
     };
-    const first = setTimeout(spawn, 150);
+    const spawn = () => {
+      // Usually one; sometimes a burst of 2–4 in quick succession
+      const n = Math.random() < CHEER_BURST_CHANCE ? 2 + Math.floor(Math.random() * 3) : 1;
+      for (let i = 0; i < n; i++) setTimeout(spawnOne, i * 70);
+    };
+    const first = setTimeout(spawn, 120);
     const timer = setInterval(spawn, CHEER_INTERVAL_MS);
     return () => { clearTimeout(first); clearInterval(timer); };
   }, []);
@@ -97,15 +171,16 @@ function CheerPopups() {
             left: `${it.x}%`,
             top: `${it.y}%`,
             '--rot': `${it.rot}deg`,
+            '--dx': `${it.dx}px`,
             fontWeight: 900,
-            fontSize: it.emoji ? '1.7rem' : '0.98rem',
+            fontSize: `${(it.emoji ? 1.7 : 1) * it.size}rem`,
             lineHeight: 1,
             color: it.color,
             textShadow: it.emoji
               ? '0 2px 6px rgba(0,0,0,0.25)'
               : '0 1px 2px rgba(0,0,0,0.45), 0 0 10px rgba(255,255,255,0.4)',
             whiteSpace: 'nowrap',
-            animation: `${cheerFloat} ${CHEER_LIFE_MS}ms cubic-bezier(0.2, 0.8, 0.3, 1) forwards`,
+            animation: `${CHEER_PATTERNS[it.pattern].kf} ${CHEER_PATTERNS[it.pattern].ms}ms cubic-bezier(0.2, 0.8, 0.3, 1) forwards`,
             willChange: 'transform, opacity',
           } as object}
         >
