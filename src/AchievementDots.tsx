@@ -104,9 +104,11 @@ const CHEER_PATTERNS = [
 const CHEER_WORDS = ['よくやった！', 'がんばった！', 'すごい！', 'えらい！', 'その調子！', '最高！', '継続は力！', '天才！', 'ナイス！', 'やるじゃん！', 'ブラボー！', 'キタ！', '神！', 'つよい！'];
 const CHEER_EMOJI = ['🎉', '👏', '🔥', '✨', '💪', '🏆', '🌈', '⭐', '🎊', '🙌', '💯', '🚀', '🥳', '👑'];
 const CHEER_COLORS = ['#ff5f6d', '#ffb347', '#7cf29c', '#5ad1ff', '#a18cff', '#ff7ad9', '#f9d423'];
-const CHEER_INTERVAL_MS = 380;
-const CHEER_BURST_CHANCE = 0.22; // sometimes 2–4 pop at once
-const CHEER_MAX = 10;
+const CHEER_INTERVAL_MS = 240;
+const CHEER_BURST_CHANCE = 0.4;  // often 3–6 pop at once
+const CHEER_GIANT_CHANCE = 0.1;  // occasional huge one
+const CHEER_OPENING_BURST = 10;  // party starts the moment the card appears
+const CHEER_MAX = 16;
 
 function toLocalDateString(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -136,15 +138,19 @@ function CheerPopups() {
       const emoji = Math.random() < 0.4;
       const pool = emoji ? CHEER_EMOJI : CHEER_WORDS;
       const pattern = Math.floor(Math.random() * CHEER_PATTERNS.length);
+      // Sizes range from small confetti-like to the occasional giant
+      const size = Math.random() < CHEER_GIANT_CHANCE
+        ? 2.4 + Math.random() * 0.9
+        : 0.65 + Math.random() * 1.3;
       const item: Cheer = {
         id: nextId++,
-        x: 8 + Math.random() * 84,
-        y: 15 + Math.random() * 70,
+        x: 5 + Math.random() * 90,
+        y: 5 + Math.random() * 88,
         text: pool[Math.floor(Math.random() * pool.length)],
         color: CHEER_COLORS[Math.floor(Math.random() * CHEER_COLORS.length)],
-        rot: (Math.random() - 0.5) * 30,
-        dx: (Math.random() - 0.5) * 90,
-        size: 0.8 + Math.random() * 0.6,
+        rot: (Math.random() - 0.5) * 34,
+        dx: (Math.random() - 0.5) * 120,
+        size,
         emoji,
         pattern,
       };
@@ -152,13 +158,15 @@ function CheerPopups() {
       setTimeout(() => setItems(prev => prev.filter(p => p.id !== item.id)), CHEER_PATTERNS[pattern].ms);
     };
     const spawn = () => {
-      // Usually one; sometimes a burst of 2–4 in quick succession
-      const n = Math.random() < CHEER_BURST_CHANCE ? 2 + Math.floor(Math.random() * 3) : 1;
-      for (let i = 0; i < n; i++) setTimeout(spawnOne, i * 70);
+      // Usually one; often a burst of 3–6 in quick succession
+      const n = Math.random() < CHEER_BURST_CHANCE ? 3 + Math.floor(Math.random() * 4) : 1;
+      for (let i = 0; i < n; i++) setTimeout(spawnOne, i * 55);
     };
-    const first = setTimeout(spawn, 120);
+    // Opening salvo, then the steady party
+    const opening: ReturnType<typeof setTimeout>[] = [];
+    for (let i = 0; i < CHEER_OPENING_BURST; i++) opening.push(setTimeout(spawnOne, 80 + i * 60));
     const timer = setInterval(spawn, CHEER_INTERVAL_MS);
-    return () => { clearTimeout(first); clearInterval(timer); };
+    return () => { opening.forEach(clearTimeout); clearInterval(timer); };
   }, []);
 
   return (
