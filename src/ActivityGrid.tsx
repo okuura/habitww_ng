@@ -2,6 +2,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { useTheme, alpha, darken } from '@mui/material/styles';
 import { useRef, useEffect, useState } from 'react';
+import { keyframes } from '@emotion/react';
 
 interface ActivityGridProps {
   completionsByDate: Map<string, number>; // date -> intensity (1|2)
@@ -63,6 +64,22 @@ function toLocalDateString(date: Date): string {
 
 const INTENSITY_LABELS = ['', '達成', 'ばっちり達成'];
 
+const CELL_SIZE = 11;
+const CELL_GAP = 2;
+
+// A week (Sun–Sat column) with all 7 days done renders as one continuous
+// vertical rainbow flowing upward. The gradient is periodic (starts and
+// ends on the same color) so a 1-image-height scroll loops seamlessly.
+const RAINBOW = 'linear-gradient(180deg, #ff5f6d, #ffc371, #f9f871, #7cf29c, #5ad1ff, #a18cff, #ff7ad9, #ff5f6d)';
+const RAINBOW_IMG_H = CELL_SIZE * 7 + CELL_GAP * 6; // px, spans the whole column
+const RAINBOW_FLOW = Array.from({ length: 7 }, (_, row) => {
+  const offset = -row * (CELL_SIZE + CELL_GAP);
+  return keyframes`
+    from { background-position: 0 ${offset}px; }
+    to   { background-position: 0 ${offset - RAINBOW_IMG_H}px; }
+  `;
+});
+
 export default function ActivityGrid({ completionsByDate, habitColor, onYesterdayClick }: ActivityGridProps) {
   const theme = useTheme();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -103,8 +120,6 @@ export default function ActivityGrid({ completionsByDate, habitColor, onYesterda
     }
   });
 
-  const CELL_SIZE = 11;
-  const CELL_GAP = 2;
   const LABEL_WIDTH = 24;
   const isDark = theme.palette.mode === 'dark';
 
@@ -183,7 +198,11 @@ export default function ActivityGrid({ completionsByDate, habitColor, onYesterda
 
           {/* Cells */}
           <Box sx={{ display: 'flex', gap: `${CELL_GAP}px` }}>
-            {weeks.map((week, wi) => (
+            {weeks.map((week, wi) => {
+              // Every day of this Sun–Sat column completed (future days can't be, so
+              // the current week only qualifies once Saturday is done)
+              const isPerfectWeek = week.every(d => (completionsByDate.get(toLocalDateString(d)) ?? 0) > 0);
+              return (
               <Box key={wi} sx={{ display: 'flex', flexDirection: 'column', gap: `${CELL_GAP}px` }}>
                 {week.map((day, di) => {
                   const dateStr = toLocalDateString(day);
@@ -218,9 +237,10 @@ export default function ActivityGrid({ completionsByDate, habitColor, onYesterda
                   }
 
                   const intensityLabel = isCompleted ? ` - ${INTENSITY_LABELS[intensity]}` : '';
+                  const weekLabel = isPerfectWeek ? ' ✦ 完璧な一週間' : '';
                   const tooltip = isOutsideYear
                     ? ''
-                    : `${dateStr}${intensityLabel}${isYesterdayClickable ? ' (タップで登録)' : ''}`;
+                    : `${dateStr}${intensityLabel}${weekLabel}${isYesterdayClickable ? ' (タップで登録)' : ''}`;
 
                   return (
                     <Box
@@ -251,12 +271,20 @@ export default function ActivityGrid({ completionsByDate, habitColor, onYesterda
                         ...(isYesterdayClickable && {
                           '&:hover': { backgroundColor: alpha(habitColor, 0.3) },
                         }),
+                        ...(isPerfectWeek && {
+                          backgroundImage: RAINBOW,
+                          backgroundSize: `100% ${RAINBOW_IMG_H}px`,
+                          backgroundRepeat: 'repeat-y',
+                          animation: `${RAINBOW_FLOW[di]} 4s linear infinite`,
+                          border: 'none',
+                        }),
                       }}
                     />
                   );
                 })}
               </Box>
-            ))}
+              );
+            })}
           </Box>
 
           {/* Lightweight hover tooltip */}
