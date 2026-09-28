@@ -1,8 +1,9 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useEffect, useState } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import GlobalStyles from '@mui/material/GlobalStyles';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import { keyframes } from '@emotion/react';
 import type { Habit, HabitCompletion } from './supabase';
 
 interface AchievementDotsProps {
@@ -11,32 +12,124 @@ interface AchievementDotsProps {
 }
 
 const DOT_PX = 7;
+const DOT_GAP = 2;
+const PITCH = DOT_PX + DOT_GAP;
 const STAGGER_MAX = 400;
 const STAGGER_TOTAL_MS = 600;
 const COMPRESS_THRESHOLD = 1000;
+
+const RAINBOW = 'linear-gradient(90deg, #ff5f6d, #ffc371, #f9f871, #7cf29c, #5ad1ff, #a18cff, #ff7ad9, #ff5f6d)';
+
+const rainbowShift = keyframes`
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 300% 50%; }
+`;
+
+// One animated filter on the container makes every dot's hue rotate in
+// lockstep — the cheapest way to sweep a rainbow across hundreds of dots.
+const hueSpin = keyframes`
+  from { filter: hue-rotate(0deg); }
+  to   { filter: hue-rotate(360deg); }
+`;
+
+const cheerFloat = keyframes`
+  0%   { transform: translate(-50%, 0) scale(0.4) rotate(var(--rot)); opacity: 0; }
+  15%  { transform: translate(-50%, -10px) scale(1.18) rotate(var(--rot)); opacity: 1; }
+  30%  { transform: translate(-50%, -16px) scale(1) rotate(var(--rot)); opacity: 1; }
+  100% { transform: translate(-50%, -76px) scale(1) rotate(var(--rot)); opacity: 0; }
+`;
+
+const CHEER_WORDS = ['よくやった！', 'がんばった！', 'すごい！', 'えらい！', 'その調子！', '最高！', '継続は力！', '天才！', 'ナイス！', 'やるじゃん！'];
+const CHEER_EMOJI = ['🎉', '👏', '🔥', '✨', '💪', '🏆', '🌈', '⭐', '🎊', '🙌'];
+const CHEER_COLORS = ['#ff5f6d', '#ffb347', '#7cf29c', '#5ad1ff', '#a18cff', '#ff7ad9', '#f9d423'];
+const CHEER_INTERVAL_MS = 650;
+const CHEER_LIFE_MS = 1700;
+const CHEER_MAX = 8;
 
 function toLocalDateString(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-// djb2 hash → [0, 1)
-function seededRandom(seed: string): number {
-  let h = 5381;
-  for (let i = 0; i < seed.length; i++) {
-    h = ((h << 5) + h) ^ seed.charCodeAt(i);
-    h = h | 0;
-  }
-  return (Math.abs(h) % 100000) / 100000;
+interface Cheer {
+  id: number;
+  x: number;
+  y: number;
+  text: string;
+  color: string;
+  rot: number;
+  emoji: boolean;
 }
 
-type Effect = 'normal' | 'gold' | 'rainbow';
+// Words of praise and party emoji popping up at random spots, for as long
+// as the card is on screen.
+function CheerPopups() {
+  const [items, setItems] = useState<Cheer[]>([]);
+
+  useEffect(() => {
+    let nextId = 0;
+    const spawn = () => {
+      const emoji = Math.random() < 0.4;
+      const pool = emoji ? CHEER_EMOJI : CHEER_WORDS;
+      const item: Cheer = {
+        id: nextId++,
+        x: 8 + Math.random() * 84,
+        y: 20 + Math.random() * 65,
+        text: pool[Math.floor(Math.random() * pool.length)],
+        color: CHEER_COLORS[Math.floor(Math.random() * CHEER_COLORS.length)],
+        rot: (Math.random() - 0.5) * 26,
+        emoji,
+      };
+      setItems(prev => [...prev.slice(-(CHEER_MAX - 1)), item]);
+      setTimeout(() => setItems(prev => prev.filter(p => p.id !== item.id)), CHEER_LIFE_MS);
+    };
+    const first = setTimeout(spawn, 150);
+    const timer = setInterval(spawn, CHEER_INTERVAL_MS);
+    return () => { clearTimeout(first); clearInterval(timer); };
+  }, []);
+
+  return (
+    <Box sx={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'visible', zIndex: 5 }}>
+      {items.map(it => (
+        <Box
+          key={it.id}
+          sx={{
+            position: 'absolute',
+            left: `${it.x}%`,
+            top: `${it.y}%`,
+            '--rot': `${it.rot}deg`,
+            fontWeight: 900,
+            fontSize: it.emoji ? '1.7rem' : '0.98rem',
+            lineHeight: 1,
+            color: it.color,
+            textShadow: it.emoji
+              ? '0 2px 6px rgba(0,0,0,0.25)'
+              : '0 1px 2px rgba(0,0,0,0.45), 0 0 10px rgba(255,255,255,0.4)',
+            whiteSpace: 'nowrap',
+            animation: `${cheerFloat} ${CHEER_LIFE_MS}ms cubic-bezier(0.2, 0.8, 0.3, 1) forwards`,
+            willChange: 'transform, opacity',
+          } as object}
+        >
+          {it.text}
+        </Box>
+      ))}
+    </Box>
+  );
+}
 
 export default function AchievementDots({ habits, completions }: AchievementDotsProps) {
   const todayStr = toLocalDateString(new Date());
-  const mountSeed = useRef(Math.random().toString()).current;
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [cols, setCols] = useState(40);
 
-  // ~20% chance per tab visit: ALL dots go gold
-  const goldMode = seededRandom(mountSeed) < 0.2;
+  // Dots per row, so each row can carry the same left→right rainbow
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el) return;
+    const update = () => setCols(Math.max(1, Math.floor((el.clientWidth + DOT_GAP) / PITCH)));
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const sorted = useMemo(() =>
     [...completions].sort((a, b) => {
@@ -56,47 +149,32 @@ export default function AchievementDots({ habits, completions }: AchievementDots
     return Math.floor((today.getTime() - first.getTime()) / 86400000) + 1;
   }, [sorted]);
 
-  const effect = useMemo<Effect>(() => {
-    if (totalCount === 0) return 'normal';
-
+  // Gold shimmer on the day a 50-completion milestone is crossed; rainbow otherwise
+  const isGoldDay = useMemo(() => {
     let run = 0;
     let latestMilestoneDate: string | null = null;
     for (const c of sorted) {
       run++;
       if (run % 50 === 0) latestMilestoneDate = c.completed_date;
     }
-    if (latestMilestoneDate === todayStr) return 'gold';
-
-    const r = seededRandom(todayStr + '-achiev-v1');
-    if (r < 0.03) return 'gold';
-    if (r < 0.05) return 'rainbow';
-    return 'normal';
-  }, [sorted, totalCount, todayStr]);
+    return latestMilestoneDate === todayStr;
+  }, [sorted, todayStr]);
 
   const compressRatio = totalCount > COMPRESS_THRESHOLD
     ? Math.ceil(totalCount / COMPRESS_THRESHOLD)
     : 1;
 
-  const { dots, displayTotal } = useMemo(() => {
-    let total = 0;
-    for (const h of habits) {
-      const n = sorted.filter(c => c.habit_id === h.id).length;
-      total += Math.ceil(n / compressRatio);
-    }
-
-    const items: { habitColor: string; opacity: number; globalIdx: number; key: string }[] = [];
+  const dots = useMemo(() => {
+    const items: { key: string; globalIdx: number }[] = [];
     let gi = 0;
-
     for (const habit of habits) {
-      const hc = sorted.filter(c => c.habit_id === habit.id);
-      if (!hc.length) continue;
-      const n = Math.ceil(hc.length / compressRatio);
+      const n = Math.ceil(sorted.filter(c => c.habit_id === habit.id).length / compressRatio);
       for (let i = 0; i < n; i++) {
-        items.push({ habitColor: habit.color, opacity: 1, globalIdx: gi, key: `${habit.id}-${i}` });
+        items.push({ key: `${habit.id}-${i}`, globalIdx: gi });
         gi++;
       }
     }
-    return { dots: items, displayTotal: total };
+    return items;
   }, [habits, sorted, compressRatio]);
 
   const shouldStagger = dots.length <= STAGGER_MAX;
@@ -111,13 +189,19 @@ export default function AchievementDots({ habits, completions }: AchievementDots
 
   if (totalCount === 0) return null;
 
-  const isGoldActive = goldMode || effect === 'gold';
-  const containerAnimation =
-    effect === 'gold'    ? 'achieveGoldGlow 2s ease-in-out infinite' :
-    effect === 'rainbow' ? 'achieveRainbow 4s linear infinite'       : undefined;
+  const rainbowText = {
+    fontWeight: 900,
+    lineHeight: 1.1,
+    background: RAINBOW,
+    backgroundSize: '300% 100%',
+    WebkitBackgroundClip: 'text',
+    backgroundClip: 'text',
+    color: 'transparent',
+    animation: `${rainbowShift} 3s linear infinite`,
+  } as const;
 
   return (
-    <>
+    <Box sx={{ position: 'relative' }}>
       <GlobalStyles styles={{
         '@keyframes achieveDotIn': {
           from: { opacity: 0, transform: 'scale(0.3)' },
@@ -127,7 +211,6 @@ export default function AchievementDots({ habits, completions }: AchievementDots
           '0%, 100%': { filter: 'brightness(1) saturate(1.2)' },
           '50%':      { filter: 'brightness(1.5) saturate(2)' },
         },
-        // Metallic sweep: dark antique gold → rich gold → pale highlight → back
         '@keyframes achieveDotGoldShimmer': {
           '0%':   { backgroundColor: '#8B6914', boxShadow: '0 0 0px 0px rgba(255,200,0,0)' },
           '35%':  { backgroundColor: '#FFD700', boxShadow: '0 0 4px 1px rgba(255,220,0,0.65)' },
@@ -135,11 +218,9 @@ export default function AchievementDots({ habits, completions }: AchievementDots
           '75%':  { backgroundColor: '#FFD700', boxShadow: '0 0 4px 1px rgba(255,220,0,0.65)' },
           '100%': { backgroundColor: '#8B6914', boxShadow: '0 0 0px 0px rgba(255,200,0,0)' },
         },
-        '@keyframes achieveRainbow': {
-          from: { filter: 'hue-rotate(0deg)' },
-          to:   { filter: 'hue-rotate(360deg)' },
-        },
       }} />
+
+      <CheerPopups />
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
         <EmojiEventsIcon sx={{ color: 'warning.main', fontSize: 20 }} />
@@ -148,12 +229,12 @@ export default function AchievementDots({ habits, completions }: AchievementDots
         </Typography>
       </Box>
 
-      <Box sx={{ mb: 0.5 }}>
+      <Box sx={{ mb: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: 0.5, mb: 0.5 }}>
           <Typography variant="body1" sx={{ color: 'text.primary', fontWeight: 500 }}>
             あなたは
           </Typography>
-          <Typography variant="h3" sx={{ fontWeight: 800, color: 'primary.main', lineHeight: 1.1 }}>
+          <Typography variant="h3" sx={rainbowText}>
             {totalDays}
           </Typography>
           <Typography variant="body1" sx={{ color: 'text.primary', fontWeight: 500 }}>
@@ -161,7 +242,7 @@ export default function AchievementDots({ habits, completions }: AchievementDots
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: 0.5 }}>
-          <Typography variant="h3" sx={{ fontWeight: 800, color: 'primary.main', lineHeight: 1.1 }}>
+          <Typography variant="h3" sx={rainbowText}>
             {totalCount}
           </Typography>
           <Typography variant="body1" sx={{ color: 'text.primary', fontWeight: 500 }}>
@@ -171,40 +252,40 @@ export default function AchievementDots({ habits, completions }: AchievementDots
       </Box>
 
       <Box
+        ref={gridRef}
         sx={{
           display: 'flex',
           flexWrap: 'wrap',
-          gap: '2px',
+          gap: `${DOT_GAP}px`,
           mb: 1.5,
-          animation: containerAnimation,
+          animation: isGoldDay
+            ? 'achieveGoldGlow 2s ease-in-out infinite'
+            : `${hueSpin} 4s linear infinite`,
         }}
       >
         {dots.map((dot, i) => {
-          const bgColor =
-            isGoldActive         ? '#8B6914' :
-            effect === 'rainbow' ? `hsl(${(dot.globalIdx / Math.max(displayTotal - 1, 1)) * 360}, 80%, 55%)` :
-            dot.habitColor;
-
-          // Stagger: wave travels from dot 0 to dot N-1 as one continuous pass
+          // Hue by column → every row shows the same left→right rainbow,
+          // and the container's hue-rotate makes it flow sideways.
+          const hue = ((dot.globalIdx % cols) / cols) * 360;
           const shimmerDelay = dot.globalIdx * (dots.length > 1 ? 1.5 / (dots.length - 1) : 0);
-          const dotSx = isGoldActive
+          const dotSx = isGoldDay
             ? { animation: `achieveDotGoldShimmer 2.2s ease-in-out ${shimmerDelay.toFixed(2)}s infinite` }
             : shouldStagger
               ? { animation: 'achieveDotIn 0.2s ease-out both', animationDelay: `${i * delayPerDot}ms` }
               : {};
 
           return (
-            <Box key={dot.key} sx={{ opacity: dot.opacity, flexShrink: 0, lineHeight: 0 }}>
-              <Box
-                sx={{
-                  width: DOT_PX,
-                  height: DOT_PX,
-                  borderRadius: '2px',
-                  bgcolor: bgColor,
-                  ...dotSx,
-                }}
-              />
-            </Box>
+            <Box
+              key={dot.key}
+              sx={{
+                width: DOT_PX,
+                height: DOT_PX,
+                borderRadius: '2px',
+                flexShrink: 0,
+                bgcolor: isGoldDay ? '#8B6914' : `hsl(${hue.toFixed(0)}, 88%, 58%)`,
+                ...dotSx,
+              }}
+            />
           );
         })}
       </Box>
@@ -227,6 +308,6 @@ export default function AchievementDots({ habits, completions }: AchievementDots
           </Box>
         ))}
       </Box>
-    </>
+    </Box>
   );
 }
