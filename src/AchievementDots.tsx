@@ -102,7 +102,11 @@ const CHEER_PATTERNS = [
 ];
 
 const CHEER_WORDS = ['よくやった！', 'がんばった！', 'すごい！', 'えらい！', 'その調子！', '最高！', '継続は力！', '天才！', 'ナイス！', 'やるじゃん！', 'ブラボー！', 'キタ！', '神！', 'つよい！'];
-const CHEER_EMOJI = ['🎉', '👏', '🔥', '✨', '💪', '🏆', '🌈', '⭐', '🎊', '🙌', '💯', '🚀', '🥳', '👑'];
+const CHEER_EMOJI = [
+  '🎉', '👏', '🔥', '✨', '💪', '🏆', '🌈', '⭐', '🎊', '🙌', '💯', '🚀', '🥳', '👑',
+  '🕺', '💃', '🎈', '🎺', '🥁', '🎸', '🤩', '😆', '👍', '🎂', '🥇', '🏅', '🦄', '🍻',
+  '🐱', '🐶', '🎯', '🌟', '💫', '🎵', '🕶️', '😎',
+];
 const CHEER_COLORS = ['#ff5f6d', '#ffb347', '#7cf29c', '#5ad1ff', '#a18cff', '#ff7ad9', '#f9d423'];
 const CHEER_INTERVAL_MS = 240;
 const CHEER_BURST_CHANCE = 0.4;  // often 3–6 pop at once
@@ -140,8 +144,8 @@ function CheerPopups() {
       const pattern = Math.floor(Math.random() * CHEER_PATTERNS.length);
       // Sizes range from small confetti-like to the occasional giant
       const size = Math.random() < CHEER_GIANT_CHANCE
-        ? 2.4 + Math.random() * 0.9
-        : 0.65 + Math.random() * 1.3;
+        ? 1.7 + Math.random() * 0.4
+        : 0.65 + Math.random() * 0.85;
       const item: Cheer = {
         id: nextId++,
         x: 5 + Math.random() * 90,
