@@ -5,6 +5,10 @@ import GlobalStyles from '@mui/material/GlobalStyles';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import { keyframes } from '@emotion/react';
 import type { Habit, HabitCompletion } from './supabase';
+// Party fonts: heavy display gothic + rounded pop. Both ship as unicode-range
+// subsets, so only the glyph ranges actually rendered get downloaded.
+import '@fontsource/dela-gothic-one';
+import '@fontsource/mochiy-pop-one';
 
 interface AchievementDotsProps {
   habits: Habit[];
@@ -108,6 +112,17 @@ const CHEER_EMOJI = [
   '🐱', '🐶', '🎯', '🌟', '💫', '🎵', '🕶️', '😎',
 ];
 const CHEER_COLORS = ['#ff5f6d', '#ffb347', '#7cf29c', '#5ad1ff', '#a18cff', '#ff7ad9', '#f9d423'];
+const CHEER_FONTS = [
+  '"Dela Gothic One", "Hiragino Sans", "Noto Sans JP", sans-serif',
+  '"Mochiy Pop One", "Hiragino Maru Gothic ProN", "Noto Sans JP", sans-serif',
+];
+
+const danceWiggle = keyframes`
+  0%, 100% { transform: rotate(-12deg) scale(1); }
+  25%      { transform: rotate(10deg) scale(1.12); }
+  50%      { transform: rotate(-8deg) scale(1); }
+  75%      { transform: rotate(12deg) scale(1.12); }
+`;
 const CHEER_INTERVAL_MS = 240;
 const CHEER_BURST_CHANCE = 0.4;  // often 3–6 pop at once
 const CHEER_GIANT_CHANCE = 0.1;  // occasional huge one
@@ -129,6 +144,7 @@ interface Cheer {
   size: number;
   emoji: boolean;
   pattern: number;
+  font: string;
 }
 
 // Words of praise and party emoji popping up at random spots, for as long
@@ -157,6 +173,7 @@ function CheerPopups() {
         size,
         emoji,
         pattern,
+        font: CHEER_FONTS[Math.floor(Math.random() * CHEER_FONTS.length)],
       };
       setItems(prev => [...prev.slice(-(CHEER_MAX - 1)), item]);
       setTimeout(() => setItems(prev => prev.filter(p => p.id !== item.id)), CHEER_PATTERNS[pattern].ms);
@@ -184,13 +201,17 @@ function CheerPopups() {
             top: `${it.y}%`,
             '--rot': `${it.rot}deg`,
             '--dx': `${it.dx}px`,
-            fontWeight: 900,
-            fontSize: `${(it.emoji ? 1.7 : 1) * it.size}rem`,
+            fontFamily: it.emoji ? undefined : it.font,
+            fontWeight: 400, // display faces carry their own weight
+            fontSize: `${(it.emoji ? 1.7 : 1.05) * it.size}rem`,
             lineHeight: 1,
+            letterSpacing: it.emoji ? 0 : '0.02em',
             color: it.color,
+            WebkitTextStroke: it.emoji ? undefined : '1.2px rgba(0,0,0,0.55)',
+            paintOrder: 'stroke fill',
             textShadow: it.emoji
               ? '0 2px 6px rgba(0,0,0,0.25)'
-              : '0 1px 2px rgba(0,0,0,0.45), 0 0 10px rgba(255,255,255,0.4)',
+              : '0 2px 0 rgba(0,0,0,0.35), 0 0 12px rgba(255,255,255,0.45)',
             whiteSpace: 'nowrap',
             animation: `${CHEER_PATTERNS[it.pattern].kf} ${CHEER_PATTERNS[it.pattern].ms}ms cubic-bezier(0.2, 0.8, 0.3, 1) forwards`,
             willChange: 'transform, opacity',
@@ -207,6 +228,7 @@ export default function AchievementDots({ habits, completions }: AchievementDots
   const todayStr = toLocalDateString(new Date());
   const gridRef = useRef<HTMLDivElement>(null);
   const [cols, setCols] = useState(40);
+  const [party, setParty] = useState(false);
 
   // Dots per row, so each row can carry the same left→right rainbow
   useEffect(() => {
@@ -307,13 +329,36 @@ export default function AchievementDots({ habits, completions }: AchievementDots
         },
       }} />
 
-      <CheerPopups />
+      {party && <CheerPopups />}
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
         <EmojiEventsIcon sx={{ color: 'warning.main', fontSize: 20 }} />
         <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
           これまでの実績
         </Typography>
+        {/* Party switch: the dancing man starts / stops the cheer popups */}
+        <Box
+          role="button"
+          aria-pressed={party}
+          aria-label={party ? 'パーティーを止める' : 'パーティーを始める'}
+          onClick={() => setParty(p => !p)}
+          sx={{
+            ml: 'auto',
+            width: 36, height: 36, borderRadius: '50%',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '1.35rem', lineHeight: 1, cursor: 'pointer', userSelect: 'none',
+            bgcolor: party ? 'rgba(255,200,60,0.28)' : 'action.hover',
+            boxShadow: party ? '0 0 0 2px rgba(255,200,60,0.6), 0 0 14px rgba(255,200,60,0.55)' : 'none',
+            transition: 'background-color 0.2s, box-shadow 0.2s',
+            '& > span': {
+              display: 'inline-block',
+              animation: party ? `${danceWiggle} 0.5s ease-in-out infinite` : `${danceWiggle} 2.4s ease-in-out infinite`,
+            },
+            '&:active': { transform: 'scale(0.92)' },
+          }}
+        >
+          <span>🕺</span>
+        </Box>
       </Box>
 
       <Box sx={{ mb: 1 }}>
