@@ -123,11 +123,12 @@ const danceWiggle = keyframes`
   50%      { transform: rotate(-8deg) scale(1); }
   75%      { transform: rotate(12deg) scale(1.12); }
 `;
-const CHEER_INTERVAL_MS = 240;
-const CHEER_BURST_CHANCE = 0.4;  // often 3–6 pop at once
+const CHEER_INTERVAL_MS = 140;   // near-continuous gush
+const CHEER_BURST_CHANCE = 0.5;  // half the ticks fire 4–7 at once
+const CHEER_EMOJI_RATIO = 0.55;
 const CHEER_GIANT_CHANCE = 0.1;  // occasional huge one
-const CHEER_OPENING_BURST = 10;  // party starts the moment the card appears
-const CHEER_MAX = 16;
+const CHEER_OPENING_BURST = 14;  // party starts with a salvo
+const CHEER_MAX = 24;
 
 function toLocalDateString(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -155,7 +156,7 @@ function CheerPopups() {
   useEffect(() => {
     let nextId = 0;
     const spawnOne = () => {
-      const emoji = Math.random() < 0.4;
+      const emoji = Math.random() < CHEER_EMOJI_RATIO;
       const pool = emoji ? CHEER_EMOJI : CHEER_WORDS;
       const pattern = Math.floor(Math.random() * CHEER_PATTERNS.length);
       // Sizes range from small confetti-like to the occasional giant
@@ -179,13 +180,13 @@ function CheerPopups() {
       setTimeout(() => setItems(prev => prev.filter(p => p.id !== item.id)), CHEER_PATTERNS[pattern].ms);
     };
     const spawn = () => {
-      // Usually one; often a burst of 3–6 in quick succession
-      const n = Math.random() < CHEER_BURST_CHANCE ? 3 + Math.floor(Math.random() * 4) : 1;
-      for (let i = 0; i < n; i++) setTimeout(spawnOne, i * 55);
+      // One or two; half the time a burst of 4–7 in quick succession
+      const n = Math.random() < CHEER_BURST_CHANCE ? 4 + Math.floor(Math.random() * 4) : 1 + Math.floor(Math.random() * 2);
+      for (let i = 0; i < n; i++) setTimeout(spawnOne, i * 40);
     };
-    // Opening salvo, then the steady party
+    // Opening salvo, then the steady gush
     const opening: ReturnType<typeof setTimeout>[] = [];
-    for (let i = 0; i < CHEER_OPENING_BURST; i++) opening.push(setTimeout(spawnOne, 80 + i * 60));
+    for (let i = 0; i < CHEER_OPENING_BURST; i++) opening.push(setTimeout(spawnOne, 60 + i * 45));
     const timer = setInterval(spawn, CHEER_INTERVAL_MS);
     return () => { opening.forEach(clearTimeout); clearInterval(timer); };
   }, []);
@@ -274,12 +275,12 @@ export default function AchievementDots({ habits, completions }: AchievementDots
     : 1;
 
   const dots = useMemo(() => {
-    const items: { key: string; globalIdx: number }[] = [];
+    const items: { key: string; globalIdx: number; habitColor: string }[] = [];
     let gi = 0;
     for (const habit of habits) {
       const n = Math.ceil(sorted.filter(c => c.habit_id === habit.id).length / compressRatio);
       for (let i = 0; i < n; i++) {
-        items.push({ key: `${habit.id}-${i}`, globalIdx: gi });
+        items.push({ key: `${habit.id}-${i}`, globalIdx: gi, habitColor: habit.color });
         gi++;
       }
     }
@@ -298,16 +299,19 @@ export default function AchievementDots({ habits, completions }: AchievementDots
 
   if (totalCount === 0) return null;
 
-  const rainbowText = {
-    fontWeight: 900,
-    lineHeight: 1.1,
-    background: RAINBOW,
-    backgroundSize: '300% 100%',
-    WebkitBackgroundClip: 'text',
-    backgroundClip: 'text',
-    color: 'transparent',
-    animation: `${rainbowShift} 3s linear infinite`,
-  } as const;
+  // Numbers: brand color normally, flowing rainbow while the party is on
+  const numberSx = party
+    ? {
+        fontWeight: 900,
+        lineHeight: 1.1,
+        background: RAINBOW,
+        backgroundSize: '300% 100%',
+        WebkitBackgroundClip: 'text',
+        backgroundClip: 'text',
+        color: 'transparent',
+        animation: `${rainbowShift} 3s linear infinite`,
+      } as const
+    : { fontWeight: 800, color: 'primary.main', lineHeight: 1.1 } as const;
 
   return (
     <Box sx={{ position: 'relative' }}>
@@ -352,7 +356,7 @@ export default function AchievementDots({ habits, completions }: AchievementDots
             transition: 'background-color 0.2s, box-shadow 0.2s',
             '& > span': {
               display: 'inline-block',
-              animation: party ? `${danceWiggle} 0.5s ease-in-out infinite` : `${danceWiggle} 2.4s ease-in-out infinite`,
+              animation: party ? `${danceWiggle} 0.45s ease-in-out infinite` : undefined,
             },
             '&:active': { transform: 'scale(0.92)' },
           }}
@@ -366,7 +370,7 @@ export default function AchievementDots({ habits, completions }: AchievementDots
           <Typography variant="body1" sx={{ color: 'text.primary', fontWeight: 500 }}>
             あなたは
           </Typography>
-          <Typography variant="h3" sx={rainbowText}>
+          <Typography variant="h3" sx={numberSx}>
             {totalDays}
           </Typography>
           <Typography variant="body1" sx={{ color: 'text.primary', fontWeight: 500 }}>
@@ -374,7 +378,7 @@ export default function AchievementDots({ habits, completions }: AchievementDots
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: 0.5 }}>
-          <Typography variant="h3" sx={rainbowText}>
+          <Typography variant="h3" sx={numberSx}>
             {totalCount}
           </Typography>
           <Typography variant="body1" sx={{ color: 'text.primary', fontWeight: 500 }}>
@@ -390,17 +394,22 @@ export default function AchievementDots({ habits, completions }: AchievementDots
           flexWrap: 'wrap',
           gap: `${DOT_GAP}px`,
           mb: 1.5,
-          animation: isGoldDay
-            ? 'achieveGoldGlow 2s ease-in-out infinite'
-            : `${hueSpin} 4s linear infinite`,
+          animation: party
+            ? `${hueSpin} 2.2s linear infinite`
+            : isGoldDay
+              ? 'achieveGoldGlow 2s ease-in-out infinite'
+              : undefined,
         }}
       >
         {dots.map((dot, i) => {
-          // Hue by column → every row shows the same left→right rainbow,
+          // Party: hue by column → every row shows the same left→right rainbow,
           // and the container's hue-rotate makes it flow sideways.
           const hue = ((dot.globalIdx % cols) / cols) * 360;
+          const bg = party
+            ? `hsl(${hue.toFixed(0)}, 88%, 58%)`
+            : isGoldDay ? '#8B6914' : dot.habitColor;
           const shimmerDelay = dot.globalIdx * (dots.length > 1 ? 1.5 / (dots.length - 1) : 0);
-          const dotSx = isGoldDay
+          const dotSx = !party && isGoldDay
             ? { animation: `achieveDotGoldShimmer 2.2s ease-in-out ${shimmerDelay.toFixed(2)}s infinite` }
             : shouldStagger
               ? { animation: 'achieveDotIn 0.2s ease-out both', animationDelay: `${i * delayPerDot}ms` }
@@ -414,7 +423,7 @@ export default function AchievementDots({ habits, completions }: AchievementDots
                 height: DOT_PX,
                 borderRadius: '2px',
                 flexShrink: 0,
-                bgcolor: isGoldDay ? '#8B6914' : `hsl(${hue.toFixed(0)}, 88%, 58%)`,
+                bgcolor: bg,
                 ...dotSx,
               }}
             />
