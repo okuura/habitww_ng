@@ -245,32 +245,43 @@ function bestStreak(completedDates: Set<string>): number {
   return best;
 }
 
-// "N日連続！" pop over the button when today's tap extends the streak
-const streakPop = keyframes`
-  0%   { transform: translate(-50%, 0) scale(0.3); opacity: 0; }
-  18%  { transform: translate(-50%, -6px) scale(1.25); opacity: 1; }
-  32%  { transform: translate(-50%, -8px) scale(1); }
-  70%  { transform: translate(-50%, -14px) scale(1.02); opacity: 1; }
-  100% { transform: translate(-50%, -46px) scale(1.08); opacity: 0; }
+// "N日連続！" slammed onto the middle of the card when today's tap extends the streak
+const streakSlam = keyframes`
+  0%   { transform: translate(-50%, -50%) scale(2.8) rotate(-4deg); opacity: 0; filter: blur(4px); }
+  18%  { transform: translate(-50%, -50%) scale(0.92) rotate(1deg); opacity: 1; filter: blur(0); }
+  28%  { transform: translate(-50%, -50%) scale(1.1) rotate(-1deg); }
+  38%  { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+  80%  { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1.2) rotate(0deg); opacity: 0; }
 `;
 
 const FIRE_GRADIENT = 'linear-gradient(180deg, #ffd54f 0%, #ff7043 45%, #d32f2f 100%)';
+// Flowing fire for the streak chip (same mechanism as the all-clear rainbow chip)
+const FIRE_FLOW = 'linear-gradient(90deg, #ff3d00, #ff9100, #ffd740, #ff9100, #ff3d00, #d50000, #ff3d00)';
 
 function StreakPop({ text }: { text: string }) {
   return (
     <Box
       sx={{
-        position: 'absolute', left: '50%', top: -6, zIndex: 25, pointerEvents: 'none',
+        position: 'absolute', left: '50%', top: '50%', zIndex: 25, pointerEvents: 'none',
         whiteSpace: 'nowrap',
-        fontFamily: '"Dela Gothic One", "Hiragino Sans", "Noto Sans JP", sans-serif',
-        fontSize: '1.15rem', lineHeight: 1,
-        background: FIRE_GRADIENT,
-        WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
-        filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.35))',
-        animation: `${streakPop} 1.5s cubic-bezier(0.2, 0.8, 0.3, 1) forwards`,
+        px: 2.5, py: 1.25, borderRadius: 3,
+        bgcolor: 'rgba(0,0,0,0.62)', backdropFilter: 'blur(4px)',
+        boxShadow: '0 0 28px rgba(255,87,34,0.55), 0 6px 20px rgba(0,0,0,0.35)',
+        animation: `${streakSlam} 1.6s cubic-bezier(0.2, 0.9, 0.3, 1) forwards`,
       }}
     >
-      {text}
+      <Box
+        sx={{
+          fontFamily: '"Dela Gothic One", "Hiragino Sans", "Noto Sans JP", sans-serif',
+          fontSize: '1.7rem', lineHeight: 1.1, textAlign: 'center',
+          background: FIRE_GRADIENT,
+          WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
+          filter: 'drop-shadow(0 2px 0 rgba(0,0,0,0.4))',
+        }}
+      >
+        {text}
+      </Box>
     </Box>
   );
 }
@@ -532,7 +543,8 @@ function AppContent() {
           ? `自己ベスト更新！ ${newStreak}日連続🔥`
           : `${newStreak}日連続！🔥`;
         setStreakMsg({ id: habit.id, text });
-        setTimeout(() => setStreakMsg(null), 1500);
+        setTimeout(() => setStreakMsg(null), 1600);
+        if (canVibrate) navigator.vibrate([20, 30, 110]);
       }
     }
 
@@ -803,6 +815,7 @@ function AppContent() {
                       key={habit.id}
                       elevation={0}
                       sx={{
+                        position: 'relative',
                         border: '1px solid',
                         borderColor: currentIntensity === 0 ? 'divider' : alpha(habit.color, 0.2 + currentIntensity * 0.1),
                         borderRadius: 2,
@@ -822,6 +835,7 @@ function AppContent() {
                         } : {}),
                       }}
                     >
+                      {streakMsg?.id === habit.id && <StreakPop text={streakMsg.text} />}
                       <CardContent sx={{ pb: 0.5, pt: 1.5, px: 2 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
                           <Box
@@ -877,13 +891,17 @@ function AppContent() {
                                 label={`${streak}日`}
                                 size="small"
                                 sx={{
-                                  bgcolor: alpha('#ff5722', 0.1),
-                                  color: '#ff5722',
-                                  fontWeight: 700,
+                                  background: FIRE_FLOW,
+                                  backgroundSize: '300% 100%',
+                                  animation: `${rainbowShift} 3s linear infinite`,
+                                  color: '#fff',
+                                  textShadow: '0 1px 1px rgba(0,0,0,0.4)',
+                                  fontWeight: 800,
                                   fontSize: '0.7rem',
                                   height: 20,
-                                  '& .MuiChip-icon': { color: '#ff5722' },
-                                  '& .MuiChip-icon path': { fill: 'url(#fire-grad)' },
+                                  boxShadow: '0 1px 6px rgba(255,61,0,0.45)',
+                                  '& .MuiChip-icon': { color: '#fff8e1' },
+                                  '& .MuiChip-icon path': { fill: '#fff8e1' },
                                 }}
                               />
                             )}
@@ -916,7 +934,6 @@ function AppContent() {
                       </CardContent>
 
                       <CardActions sx={{ px: 2, pb: 1.5, pt: 0.5, position: 'relative' }}>
-                        {streakMsg?.id === habit.id && <StreakPop text={streakMsg.text} />}
                         {celebrating?.id === habit.id && (
                           <ConfettiBurst color={habit.color} count={celebrating.level === 2 ? CONFETTI_CONFIGS.length : 6} />
                         )}
