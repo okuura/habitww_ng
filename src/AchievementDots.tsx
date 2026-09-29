@@ -165,8 +165,9 @@ function CheerPopups() {
         : 0.65 + Math.random() * 0.85;
       const item: Cheer = {
         id: nextId++,
-        x: 5 + Math.random() * 90,
-        y: 5 + Math.random() * 88,
+        // Spawn beyond the card edges too, so the party spills out of the card
+        x: -10 + Math.random() * 120,
+        y: -12 + Math.random() * 112,
         text: pool[Math.floor(Math.random() * pool.length)],
         color: CHEER_COLORS[Math.floor(Math.random() * CHEER_COLORS.length)],
         rot: (Math.random() - 0.5) * 34,

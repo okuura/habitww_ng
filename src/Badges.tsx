@@ -380,7 +380,11 @@ export default function Badges({ habits, completions }: BadgesProps) {
               </Typography>
               {(currentStreak > 0 || bestStreak > 0) && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25, ml: 'auto' }}>
-                  <LocalFireDepartmentIcon sx={{ fontSize: 13, color: currentStreak >= bestStreak && currentStreak > 0 ? 'warning.main' : 'text.disabled' }} />
+                  <LocalFireDepartmentIcon
+                    sx={currentStreak > 0
+                      ? { fontSize: 13, '& path': { fill: 'url(#fire-grad)' } }
+                      : { fontSize: 13, color: 'text.disabled' }}
+                  />
                   <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.66rem' }}>
                     {currentStreak}日継続中
                     {bestStreak > currentStreak

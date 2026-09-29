@@ -49,6 +49,8 @@ import { alpha, darken, lighten } from '@mui/material/styles';
 import { keyframes } from '@emotion/react';
 import type { User } from '@supabase/supabase-js';
 import theme from './theme';
+// Heavy display face for the streak pop (unicode-range subsets: only used glyphs load)
+import '@fontsource/dela-gothic-one';
 import {
   supabase,
   initialSession,
@@ -223,6 +225,56 @@ function toLocalDateString(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
+/** 全期間での最長連続日数 */
+function bestStreak(completedDates: Set<string>): number {
+  const sorted = [...completedDates].sort();
+  let best = 0;
+  let run = 0;
+  let prev: string | null = null;
+  for (const ds of sorted) {
+    if (prev !== null) {
+      const p = new Date(prev + 'T00:00:00');
+      p.setDate(p.getDate() + 1);
+      run = toLocalDateString(p) === ds ? run + 1 : 1;
+    } else {
+      run = 1;
+    }
+    if (run > best) best = run;
+    prev = ds;
+  }
+  return best;
+}
+
+// "N日連続！" pop over the button when today's tap extends the streak
+const streakPop = keyframes`
+  0%   { transform: translate(-50%, 0) scale(0.3); opacity: 0; }
+  18%  { transform: translate(-50%, -6px) scale(1.25); opacity: 1; }
+  32%  { transform: translate(-50%, -8px) scale(1); }
+  70%  { transform: translate(-50%, -14px) scale(1.02); opacity: 1; }
+  100% { transform: translate(-50%, -46px) scale(1.08); opacity: 0; }
+`;
+
+const FIRE_GRADIENT = 'linear-gradient(180deg, #ffd54f 0%, #ff7043 45%, #d32f2f 100%)';
+
+function StreakPop({ text }: { text: string }) {
+  return (
+    <Box
+      sx={{
+        position: 'absolute', left: '50%', top: -6, zIndex: 25, pointerEvents: 'none',
+        whiteSpace: 'nowrap',
+        fontFamily: '"Dela Gothic One", "Hiragino Sans", "Noto Sans JP", sans-serif',
+        fontSize: '1.15rem', lineHeight: 1,
+        background: FIRE_GRADIENT,
+        WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
+        filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.35))',
+        animation: `${streakPop} 1.5s cubic-bezier(0.2, 0.8, 0.3, 1) forwards`,
+      }}
+    >
+      {text}
+    </Box>
+  );
+}
+
 function calculateStreak(completedDates: Set<string>): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -273,6 +325,7 @@ function AppContent() {
   const [toggling, setToggling] = useState<string | null>(null);
   const [celebrating, setCelebrating] = useState<{ id: string; level: 1 | 2 } | null>(null);
   const [fever, setFever] = useState(false);
+  const [streakMsg, setStreakMsg] = useState<{ id: string; text: string } | null>(null);
   const [accountMenuAnchor, setAccountMenuAnchor] = useState<null | HTMLElement>(null);
   const [deleteAccountDialogOpen, setDeleteAccountDialogOpen] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
@@ -468,6 +521,20 @@ function AppContent() {
       setFever(true);
       setTimeout(() => setFever(false), FEVER_MS);
     }
+    // First completion of the day: shout out the streak it extends
+    if (current === 0 && nextIntensity === 1) {
+      const before = new Set((completionsByHabit.get(habit.id) ?? new Map<string, number>()).keys());
+      const after = new Set(before);
+      after.add(todayStr);
+      const newStreak = calculateStreak(after);
+      if (newStreak >= 2) {
+        const text = newStreak > bestStreak(before)
+          ? `自己ベスト更新！ ${newStreak}日連続🔥`
+          : `${newStreak}日連続！🔥`;
+        setStreakMsg({ id: habit.id, text });
+        setTimeout(() => setStreakMsg(null), 1500);
+      }
+    }
 
     // Optimistic update for instant UI feedback
     setCompletions(prev => {
@@ -592,6 +659,16 @@ function AppContent() {
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       {fever && <FeverOverlay colors={habits.map(h => h.color)} />}
+      {/* Shared gradient for flame icons (referenced via fill: url(#fire-grad)) */}
+      <svg width={0} height={0} style={{ position: 'absolute' }} aria-hidden focusable="false">
+        <defs>
+          <linearGradient id="fire-grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#ffd54f" />
+            <stop offset="45%" stopColor="#ff7043" />
+            <stop offset="100%" stopColor="#d32f2f" />
+          </linearGradient>
+        </defs>
+      </svg>
       <AppBar position="sticky" elevation={0} sx={{ bgcolor: 'background.paper', borderBottom: 1, borderColor: 'divider' }}>
         <Toolbar>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1 }}>
@@ -806,6 +883,7 @@ function AppContent() {
                                   fontSize: '0.7rem',
                                   height: 20,
                                   '& .MuiChip-icon': { color: '#ff5722' },
+                                  '& .MuiChip-icon path': { fill: 'url(#fire-grad)' },
                                 }}
                               />
                             )}
@@ -838,6 +916,7 @@ function AppContent() {
                       </CardContent>
 
                       <CardActions sx={{ px: 2, pb: 1.5, pt: 0.5, position: 'relative' }}>
+                        {streakMsg?.id === habit.id && <StreakPop text={streakMsg.text} />}
                         {celebrating?.id === habit.id && (
                           <ConfettiBurst color={habit.color} count={celebrating.level === 2 ? CONFETTI_CONFIGS.length : 6} />
                         )}

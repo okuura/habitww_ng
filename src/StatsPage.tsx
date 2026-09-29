@@ -255,10 +255,10 @@ export default function StatsPage({ habits, completions }: StatsPageProps) {
         </CardContent>
       </Card>
 
-      {/* 3. Total effort — dot visualisation */}
+      {/* 3. Total effort — dot visualisation (overflow visible so the party spills out) */}
       <Card
         elevation={0}
-        sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2 }}
+        sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2, overflow: 'visible' }}
       >
         <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
           <AchievementDots habits={habits} completions={completions} />
