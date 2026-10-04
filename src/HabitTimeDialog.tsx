@@ -59,10 +59,16 @@ export default function HabitTimeDialog({ habit, onClose, onSave }: HabitTimeDia
           value={time}
           onChange={e => setTime(e.target.value)}
           fullWidth
-          inputProps={{ step: 300, sx: { fontSize: '1.6rem', fontWeight: 700, textAlign: 'center', py: 1.5 } }}
+          inputProps={{
+            step: 300,
+            sx: {
+              fontSize: '1.6rem', fontWeight: 700, textAlign: 'center', py: 1.5,
+              // iOS は時刻を内部要素で描画し、そのままだと上・左に寄る。flex で縦横とも中央に置く
+              height: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            },
+          }}
           sx={{
             mt: 1,
-            // iOS は時刻を内部要素で描画するため、textAlign だけでは中央に寄らない
             '& input::-webkit-date-and-time-value': { textAlign: 'center' },
           }}
         />
