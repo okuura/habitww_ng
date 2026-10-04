@@ -296,6 +296,23 @@ function pickBacchiriPraise(): string {
   return lastBacchiriPraise;
 }
 
+/**
+ * Dela Gothic One は unicode-range で 100 以上のファイルに分かれていて、初めて表示する文字の分だけ
+ * その場で読み込まれる。ポップの文言が一瞬別フォントで出ないよう、使う文字を先に読み込んでおく
+ */
+const POP_FONT_GLYPHS = [
+  ...BACCHIRI_PRAISES,
+  '時間どおり！',
+  '自己ベスト更新！ 日連続！',
+  '0123456789',
+].join('');
+function preloadPopFont() {
+  if (typeof document === 'undefined' || !document.fonts) return;
+  document.fonts.load('400 1em "Dela Gothic One"', POP_FONT_GLYPHS).catch(() => {
+    // 読み込めなくても表示は代替フォントで続く
+  });
+}
+
 function StreakPop({ text, variant = 'fire' }: { text: string; variant?: PopVariant }) {
   const isLightning = variant === 'lightning';
   return (
@@ -430,6 +447,12 @@ function AppContent() {
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
   const yesterdayStr = toLocalDateString(yesterday);
+
+  // ポップ用フォントの先読み(初回表示の邪魔をしないよう、少し待ってから)
+  useEffect(() => {
+    const timer = setTimeout(preloadPopFont, 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Auth state listener (initialSession was kicked off at module load,
   // in parallel with React mounting)
