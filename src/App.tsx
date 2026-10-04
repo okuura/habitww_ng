@@ -1049,7 +1049,8 @@ function AppContent() {
                         />
                       </CardContent>
 
-                      <CardActions sx={{ px: 2, pb: 1.5, pt: 0.5, position: 'relative' }}>
+                      {/* disableSpacing: 紙吹雪(ConfettiBurst)が兄弟要素として入る間、ボタンに左余白 8px が付いて幅が縮むのを防ぐ */}
+                      <CardActions disableSpacing sx={{ px: 2, pb: 1.5, pt: 0.5, position: 'relative' }}>
                         {celebrating?.id === habit.id && (
                           <ConfettiBurst color={habit.color} count={celebrating.level === 2 ? CONFETTI_CONFIGS.length : 6} />
                         )}
