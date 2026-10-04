@@ -11,3 +11,11 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/** iOS アプリ(habitww-ios)の WebView 内でのみ注入されるネイティブ API */
+interface Window {
+  HabitwwNative?: {
+    platform: 'ios';
+    openSettings: () => void;
+  };
+}

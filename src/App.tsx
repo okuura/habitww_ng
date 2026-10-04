@@ -40,6 +40,7 @@ import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PersonOffIcon from '@mui/icons-material/PersonOff';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ShareIcon from '@mui/icons-material/Share';
@@ -751,6 +752,15 @@ function AppContent() {
             : <DarkModeIcon fontSize="small" sx={{ color: 'text.secondary' }} />}
           <Typography variant="body2">{mode === 'dark' ? 'ライトモード' : 'ダークモード'}</Typography>
         </MenuItem>
+        {window.HabitwwNative && (
+          <MenuItem
+            onClick={() => { setAccountMenuAnchor(null); window.HabitwwNative?.openSettings(); }}
+            sx={{ gap: 1.5, py: 1.5 }}
+          >
+            <NotificationsActiveIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+            <Typography variant="body2">通知・ウィジェット設定</Typography>
+          </MenuItem>
+        )}
         <MenuItem onClick={handleSignOut} sx={{ gap: 1.5, py: 1.5 }}>
           <LogoutIcon fontSize="small" sx={{ color: 'text.secondary' }} />
           <Typography variant="body2">ログアウト</Typography>
