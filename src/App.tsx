@@ -1023,7 +1023,6 @@ function AppContent() {
                           )}
                           {habit.scheduled_time && editingHabitId !== habit.id && (
                             <Chip
-                              icon={<AccessTimeIcon sx={{ fontSize: '0.85rem !important' }} />}
                               label={
                                 <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.25 }}>
                                   {formatScheduledTime(habit.scheduled_time)}
@@ -1036,26 +1035,12 @@ function AppContent() {
                               sx={{
                                 height: 20, fontSize: '0.68rem', fontWeight: 700,
                                 color: 'text.secondary', borderColor: 'divider', flexShrink: 0,
-                                '& .MuiChip-icon': { color: 'text.secondary', ml: '4px' },
-                                '& .MuiChip-label': { px: '6px' },
+                                '& .MuiChip-label': { px: '7px' },
                               }}
                             />
                           )}
 
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            {isShared && (
-                              <Chip
-                                label="共有中"
-                                size="small"
-                                sx={{
-                                  bgcolor: alpha('#4caf50', 0.1),
-                                  color: '#2e7d32',
-                                  fontWeight: 600,
-                                  fontSize: '0.62rem',
-                                  height: 18,
-                                }}
-                              />
-                            )}
                             {streak > 0 && (
                               <Chip
                                 icon={<LocalFireDepartmentIcon sx={{ fontSize: '0.9rem !important' }} />}
