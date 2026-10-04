@@ -906,6 +906,8 @@ function AppContent() {
                       sx={{
                         position: 'relative',
                         border: '1px solid',
+                        // ばっちり達成の虹枠(2px)に切り替わってもカードの大きさ・中身の位置が変わらないよう 1px 分を余白で確保
+                        p: '1px',
                         borderColor: currentIntensity === 0 ? 'divider' : alpha(habit.color, 0.2 + currentIntensity * 0.1),
                         borderRadius: 2,
                         transition: theme.transitions.create(['border-color', 'box-shadow'], {
@@ -915,6 +917,7 @@ function AppContent() {
                         // Level 2: the card frame flows with the same rainbow as the button
                         ...(currentIntensity === 2 ? {
                           border: '2px solid transparent',
+                          p: 0,
                           background: `linear-gradient(${paperBg}, ${paperBg}) padding-box, ${RAINBOW} border-box`,
                           backgroundSize: '100% 100%, 300% 100%',
                           animation: `${rainbowShift} 3s linear infinite`,
@@ -1064,7 +1067,6 @@ function AppContent() {
                               variant: 'outlined' as const,
                               icon: <RadioButtonUncheckedIcon />,
                               label: '実施',
-                              large: false,
                               sx: {
                                 borderColor: habit.color, color: habit.color,
                                 '&:hover': { bgcolor: alpha(habit.color, 0.08), borderColor: habit.color },
@@ -1074,7 +1076,6 @@ function AppContent() {
                               variant: 'contained' as const,
                               icon: fireIcon,
                               label: '達成！',
-                              large: false,
                               sx: {
                                 bgcolor: stdBg,
                                 color: theme.palette.getContrastText(stdBg),
@@ -1090,7 +1091,6 @@ function AppContent() {
                                 </Box>
                               ),
                               label: 'ばっちり達成！',
-                              large: true,
                               sx: {
                                 background: RAINBOW,
                                 backgroundSize: '300% 100%',
@@ -1120,8 +1120,10 @@ function AppContent() {
                               sx={{
                                 borderRadius: 2,
                                 fontWeight: 700,
-                                fontSize: cfg.large ? '0.95rem' : '0.875rem',
-                                py: cfg.large ? 1.1 : 0.75,
+                                // 状態が変わってもボタンの大きさは一定に(枠線ありの「実施」と高さを揃えるため透明の枠線を持たせる)
+                                fontSize: '0.875rem',
+                                py: 0.75,
+                                border: '1px solid transparent',
                                 ...cfg.sx,
                               }}
                             >
