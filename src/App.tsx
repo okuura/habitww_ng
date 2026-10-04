@@ -947,7 +947,8 @@ function AppContent() {
                                 if (e.key === 'Escape') setEditingHabitId(null);
                               }}
                               sx={{ flex: 1 }}
-                              inputProps={{ sx: { fontWeight: 700, fontSize: '0.9rem', py: 0.5 } }}
+                              // 16px 未満だと iOS がフォーカス時に画面を拡大するので、表示中の習慣名(1rem)と同じにする
+                              inputProps={{ sx: { fontWeight: 700, fontSize: '1rem', py: 0.5 } }}
                             />
                           ) : (
                             <Typography
