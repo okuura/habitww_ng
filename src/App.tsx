@@ -1028,6 +1028,10 @@ function AppContent() {
                               sx={{
                                 fontWeight: 700, flex: 1, color: 'text.primary',
                                 cursor: 'pointer', '&:hover': { color: 'primary.main' },
+                                // 長い名前は 2 行まで表示して残りは …。区切りのない英数字の連続も途中で折り返し、
+                                // 右側の実施時間・連続・︙ を押し出さないようにする
+                                minWidth: 0, overflowWrap: 'anywhere',
+                                display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, overflow: 'hidden',
                               }}
                             >
                               {habit.name}
@@ -1052,7 +1056,7 @@ function AppContent() {
                             />
                           )}
 
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
                             {streak > 0 && (
                               <Chip
                                 icon={<LocalFireDepartmentIcon sx={{ fontSize: '0.9rem !important' }} />}
