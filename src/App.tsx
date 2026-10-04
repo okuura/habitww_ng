@@ -289,11 +289,23 @@ const BACCHIRI_PRAISES = [
   '未来を変える一歩！',
   '全身全霊！',
 ];
-let lastBacchiriPraise = '';
-function pickBacchiriPraise(): string {
-  const candidates = BACCHIRI_PRAISES.filter(p => p !== lastBacchiriPraise);
-  lastBacchiriPraise = candidates[Math.floor(Math.random() * candidates.length)];
-  return lastBacchiriPraise;
+/** 疾風迅雷の褒め言葉(前倒しの達成も含むので「時間ぴったり」を前提にしない言葉) */
+const ON_TIME_PRAISES = [
+  '速攻クリア！',
+  '段取り上手！',
+  'スピード達成！',
+  '先手必勝！',
+  'さすがの素早さ！',
+  'キレキレですね！',
+];
+
+/** リストからランダムに 1 つ。リストごとに直前の文言を覚え、同じものが続かないようにする */
+const lastPraise = new Map<readonly string[], string>();
+function pickPraise(list: readonly string[]): string {
+  const candidates = list.filter(p => p !== lastPraise.get(list));
+  const picked = candidates[Math.floor(Math.random() * candidates.length)];
+  lastPraise.set(list, picked);
+  return picked;
 }
 
 /**
@@ -302,7 +314,7 @@ function pickBacchiriPraise(): string {
  */
 const POP_FONT_GLYPHS = [
   ...BACCHIRI_PRAISES,
-  '時間どおり！',
+  ...ON_TIME_PRAISES,
   '自己ベスト更新！ 日連続！',
   '0123456789',
 ].join('');
@@ -637,7 +649,7 @@ function AppContent() {
 
     // 達成 → ばっちり達成: がんばりを褒める一言(振動はタップ時のばっちり用パターンで十分)
     if (current === 1 && nextIntensity === 2) {
-      showPop({ id: habit.id, text: pickBacchiriPraise(), variant: 'rainbow' }, 1600);
+      showPop({ id: habit.id, text: pickPraise(BACCHIRI_PRAISES), variant: 'rainbow' }, 1600);
     }
 
     // First completion of the day: shout out the streak it extends
@@ -656,8 +668,8 @@ function AppContent() {
         if (canVibrate) navigator.vibrate([20, 30, 110]);
       };
       if (onTime) {
-        // 「時間どおり！」→ 連続記録 の順に 1 枚ずつ見せる
-        showPop({ id: habit.id, text: '時間どおり！', variant: 'lightning' }, 1900);
+        // 疾風迅雷の褒め言葉 → 連続記録 の順に 1 枚ずつ見せる
+        showPop({ id: habit.id, text: pickPraise(ON_TIME_PRAISES), variant: 'lightning' }, 1900);
         if (canVibrate) navigator.vibrate([30, 20, 30, 20, 150]);
         setTimeout(showStreak, 1750);
       } else {

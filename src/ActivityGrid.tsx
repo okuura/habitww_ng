@@ -236,7 +236,7 @@ export default function ActivityGrid({ completionsByDate, onTimeDates, habitColo
                   }
 
                   const intensityLabel = isCompleted
-                    ? ` - ${INTENSITY_LABELS[intensity]}${isOnTime ? ' ⚡時間どおり' : ''}`
+                    ? ` - ${INTENSITY_LABELS[intensity]}${isOnTime ? ' ⚡疾風迅雷' : ''}`
                     : '';
                   const tooltip = isOutsideYear
                     ? ''
