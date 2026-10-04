@@ -986,9 +986,8 @@ function AppContent() {
                       {streakMsg?.id === habit.id && (
                         <StreakPop key={streakMsg.text} text={streakMsg.text} variant={streakMsg.variant} />
                       )}
-                      <CardContent sx={{ pb: 0.5, pt: 0.75, px: 2 }}>
-                        {/* 1 段目: 色・習慣名・︙ / 2 段目: 実施時間・共有中・連続・累計 */}
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <CardContent sx={{ pb: 0.5, pt: 1.5, px: 2 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
                           <Box
                             sx={{
                               width: 10, height: 10, borderRadius: '50%',
@@ -1013,41 +1012,16 @@ function AppContent() {
                           ) : (
                             <Typography
                               variant="body1"
-                              noWrap
                               onClick={() => { setEditingHabitId(habit.id); setEditingHabitName(habit.name); }}
                               sx={{
-                                fontWeight: 700, flex: 1, minWidth: 0, color: 'text.primary', lineHeight: 1.25,
+                                fontWeight: 700, flex: 1, color: 'text.primary',
                                 cursor: 'pointer', '&:hover': { color: 'primary.main' },
-                                // 長い名前は 1 行で … にする(縦に折り返さない)
                               }}
                             >
                               {habit.name}
                             </Typography>
                           )}
-                          {/* 3-dot menu button(行の高さを広げないよう余白を詰める) */}
-                          <IconButton
-                            size="small"
-                            onClick={e => {
-                              setHabitMenuAnchor(e.currentTarget);
-                              setHabitMenuTarget(habit.id);
-                            }}
-                            sx={{
-                              color: isShared ? 'primary.main' : 'text.disabled',
-                              '&:hover': { color: 'text.primary' },
-                              p: 0.25, my: -0.5, mr: -0.5,
-                            }}
-                          >
-                            <MoreVertIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
-                        <Box
-                          sx={{
-                            display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 0.75,
-                            // 色の点(10px) + 間隔(12px) ぶん字下げして習慣名とそろえる
-                            pl: '22px', mt: 0.25, mb: 0.5,
-                          }}
-                        >
-                          {habit.scheduled_time && (
+                          {habit.scheduled_time && editingHabitId !== habit.id && (
                             <Chip
                               icon={<AccessTimeIcon sx={{ fontSize: '0.85rem !important' }} />}
                               label={
@@ -1067,42 +1041,60 @@ function AppContent() {
                               }}
                             />
                           )}
-                          {isShared && (
-                            <Chip
-                              label="共有中"
+
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            {isShared && (
+                              <Chip
+                                label="共有中"
+                                size="small"
+                                sx={{
+                                  bgcolor: alpha('#4caf50', 0.1),
+                                  color: '#2e7d32',
+                                  fontWeight: 600,
+                                  fontSize: '0.62rem',
+                                  height: 18,
+                                }}
+                              />
+                            )}
+                            {streak > 0 && (
+                              <Chip
+                                icon={<LocalFireDepartmentIcon sx={{ fontSize: '0.9rem !important' }} />}
+                                label={`${streak}日`}
+                                size="small"
+                                sx={{
+                                  background: FIRE_FLOW,
+                                  backgroundSize: '300% 100%',
+                                  animation: `${rainbowShift} 3s linear infinite`,
+                                  color: '#fff',
+                                  textShadow: '0 1px 1px rgba(0,0,0,0.4)',
+                                  fontWeight: 800,
+                                  fontSize: '0.7rem',
+                                  height: 20,
+                                  boxShadow: '0 1px 6px rgba(255,61,0,0.45)',
+                                  '& .MuiChip-icon': { color: '#fff8e1' },
+                                  '& .MuiChip-icon path': { fill: '#fff8e1' },
+                                }}
+                              />
+                            )}
+                            <Typography variant="caption" sx={{ color: 'text.secondary', minWidth: 40, textAlign: 'right' }}>
+                              計 {totalCount}日
+                            </Typography>
+                            {/* 3-dot menu button */}
+                            <IconButton
                               size="small"
-                              sx={{
-                                bgcolor: alpha('#4caf50', 0.1),
-                                color: '#2e7d32',
-                                fontWeight: 600,
-                                fontSize: '0.62rem',
-                                height: 18,
+                              onClick={e => {
+                                setHabitMenuAnchor(e.currentTarget);
+                                setHabitMenuTarget(habit.id);
                               }}
-                            />
-                          )}
-                          {streak > 0 && (
-                            <Chip
-                              icon={<LocalFireDepartmentIcon sx={{ fontSize: '0.9rem !important' }} />}
-                              label={`${streak}日`}
-                              size="small"
                               sx={{
-                                background: FIRE_FLOW,
-                                backgroundSize: '300% 100%',
-                                animation: `${rainbowShift} 3s linear infinite`,
-                                color: '#fff',
-                                textShadow: '0 1px 1px rgba(0,0,0,0.4)',
-                                fontWeight: 800,
-                                fontSize: '0.7rem',
-                                height: 20,
-                                boxShadow: '0 1px 6px rgba(255,61,0,0.45)',
-                                '& .MuiChip-icon': { color: '#fff8e1' },
-                                '& .MuiChip-icon path': { fill: '#fff8e1' },
+                                color: isShared ? 'primary.main' : 'text.disabled',
+                                '&:hover': { color: 'text.primary' },
+                                ml: 0.5,
                               }}
-                            />
-                          )}
-                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                            計 {totalCount}日
-                          </Typography>
+                            >
+                              <MoreVertIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
                         </Box>
 
                         <ActivityGrid
@@ -1114,7 +1106,7 @@ function AppContent() {
                       </CardContent>
 
                       {/* disableSpacing: 紙吹雪(ConfettiBurst)が兄弟要素として入る間、ボタンに左余白 8px が付いて幅が縮むのを防ぐ */}
-                      <CardActions disableSpacing sx={{ px: 2, pb: 1, pt: 0.25, position: 'relative' }}>
+                      <CardActions disableSpacing sx={{ px: 2, pb: 1.5, pt: 0.5, position: 'relative' }}>
                         {celebrating?.id === habit.id && (
                           <ConfettiBurst color={habit.color} count={celebrating.level === 2 ? CONFETTI_CONFIGS.length : 6} />
                         )}
