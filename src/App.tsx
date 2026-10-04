@@ -372,6 +372,31 @@ function isOnTime(habit: Habit, now: Date): boolean {
   return now.getTime() <= deadline.getTime();
 }
 
+/**
+ * その日に一度取った疾風迅雷を覚えておく(habitId -> 日付)。
+ * ボタンを一周させる(ばっちり → 未実施)と記録ごと消えるので、同じ日に押し直したときに引き継ぐ
+ */
+const ON_TIME_EARNED_KEY = 'habitww-on-time-earned';
+function readOnTimeEarned(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem(ON_TIME_EARNED_KEY) ?? '{}') as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+function hasEarnedOnTime(habitId: string, date: string): boolean {
+  return readOnTimeEarned()[habitId] === date;
+}
+function markOnTimeEarned(habitId: string, date: string): void {
+  try {
+    // 今日以外の古い記録は捨てる
+    const kept = Object.fromEntries(Object.entries(readOnTimeEarned()).filter(([, d]) => d === date));
+    localStorage.setItem(ON_TIME_EARNED_KEY, JSON.stringify({ ...kept, [habitId]: date }));
+  } catch {
+    // storage unavailable — best-effort
+  }
+}
+
 /** "07:05:00" → "7:05" */
 function formatScheduledTime(time: string): string {
   const [h, m] = time.split(':');
@@ -626,8 +651,13 @@ function AppContent() {
     const willBeAllDone = habits.length > 0 && nextIntensity > 0
       && habits.every(h => h.id === habit.id || completedToday.has(h.id));
 
-    // 疾風迅雷: その日の最初の達成が実施時間 + 10 分以内か
-    const onTime = current === 0 && nextIntensity === 1 && isOnTime(habit, new Date());
+    // 疾風迅雷: その日の最初の達成が実施時間 + 10 分以内か。
+    // 今日すでに取っていれば、一周させて押し直しても疾風迅雷のまま
+    const todayCompletion = completions.find(c => c.habit_id === habit.id && c.completed_date === todayStr);
+    if (todayCompletion?.on_time) markOnTimeEarned(habit.id, todayStr);
+    const onTime = current === 0 && nextIntensity === 1
+      && (isOnTime(habit, new Date()) || hasEarnedOnTime(habit.id, todayStr));
+    if (onTime) markOnTimeEarned(habit.id, todayStr);
 
     // Feedback fires immediately on tap — never wait for the network
     const canVibrate = typeof navigator !== 'undefined' && !!navigator.vibrate;
