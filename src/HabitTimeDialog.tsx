@@ -60,7 +60,11 @@ export default function HabitTimeDialog({ habit, onClose, onSave }: HabitTimeDia
           onChange={e => setTime(e.target.value)}
           fullWidth
           inputProps={{ step: 300, sx: { fontSize: '1.6rem', fontWeight: 700, textAlign: 'center', py: 1.5 } }}
-          sx={{ mt: 1 }}
+          sx={{
+            mt: 1,
+            // iOS は時刻を内部要素で描画するため、textAlign だけでは中央に寄らない
+            '& input::-webkit-date-and-time-value': { textAlign: 'center' },
+          }}
         />
 
         {isNativeApp ? (
@@ -83,7 +87,7 @@ export default function HabitTimeDialog({ habit, onClose, onSave }: HabitTimeDia
         >
           <BoltIcon sx={{ color: '#ffb300', fontSize: '1.2rem', mt: '1px' }} />
           <Typography variant="caption" sx={{ color: 'text.secondary', lineHeight: 1.6 }}>
-            疾風迅雷: 実施時間から10分以内に達成すると「時間どおり！」。草グラフに稲妻マークが付きます。
+            設定した実施時間から10分以内（またはそれより前）に習慣を完了させると、速攻で実施した⚡️マークが付きます。
           </Typography>
         </Box>
       </DialogContent>
