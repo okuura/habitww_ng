@@ -267,7 +267,36 @@ const LIGHTNING_GRADIENT = 'linear-gradient(180deg, #fff59d 0%, #ffffff 40%, #4f
 // Flowing fire for the streak chip (same mechanism as the all-clear rainbow chip)
 const FIRE_FLOW = 'linear-gradient(90deg, #ff3d00, #ff9100, #ffd740, #ff9100, #ff3d00, #d50000, #ff3d00)';
 
-function StreakPop({ text, variant = 'fire' }: { text: string; variant?: 'fire' | 'lightning' }) {
+type PopVariant = 'fire' | 'lightning' | 'rainbow';
+
+const POP_TEXT_GRADIENT: Record<PopVariant, string> = {
+  fire: FIRE_GRADIENT,
+  lightning: LIGHTNING_GRADIENT,
+  // ばっちり達成: ボタンと同じ虹色を文字に流す
+  rainbow: RAINBOW,
+};
+const POP_GLOW: Record<PopVariant, string> = {
+  fire: 'rgba(255,87,34,0.8)',
+  lightning: 'rgba(79,195,247,0.85)',
+  rainbow: 'rgba(255,255,255,0.7)',
+};
+
+/** ばっちり達成！の褒め言葉(タップのたびにランダム。直前と同じものは避ける) */
+const BACCHIRI_PRAISES = [
+  '限界突破！',
+  '今日のあなた、120点！',
+  '昨日の自分を超えた！',
+  '未来を変える一歩！',
+  '全身全霊！',
+];
+let lastBacchiriPraise = '';
+function pickBacchiriPraise(): string {
+  const candidates = BACCHIRI_PRAISES.filter(p => p !== lastBacchiriPraise);
+  lastBacchiriPraise = candidates[Math.floor(Math.random() * candidates.length)];
+  return lastBacchiriPraise;
+}
+
+function StreakPop({ text, variant = 'fire' }: { text: string; variant?: PopVariant }) {
   const isLightning = variant === 'lightning';
   return (
     <Box
@@ -282,9 +311,7 @@ function StreakPop({ text, variant = 'fire' }: { text: string; variant?: 'fire' 
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5,
           // 背景の帯なしでも読めるよう、濃い縁取り + 色付きの光彩。
           // background-clip: text の要素自体に filter をかけると WebKit で崩れることがあるので外側に置く
-          filter: isLightning
-            ? 'drop-shadow(0 0 1px rgba(0,0,0,0.9)) drop-shadow(0 2px 2px rgba(0,0,0,0.6)) drop-shadow(0 0 10px rgba(79,195,247,0.85))'
-            : 'drop-shadow(0 0 1px rgba(0,0,0,0.9)) drop-shadow(0 2px 2px rgba(0,0,0,0.6)) drop-shadow(0 0 10px rgba(255,87,34,0.8))',
+          filter: `drop-shadow(0 0 1px rgba(0,0,0,0.9)) drop-shadow(0 2px 2px rgba(0,0,0,0.6)) drop-shadow(0 0 10px ${POP_GLOW[variant]})`,
         }}
       >
         {isLightning && (
@@ -294,7 +321,7 @@ function StreakPop({ text, variant = 'fire' }: { text: string; variant?: 'fire' 
           sx={{
             fontFamily: '"Dela Gothic One", "Hiragino Sans", "Noto Sans JP", sans-serif',
             fontSize: '1.55rem', lineHeight: 1.1, textAlign: 'center',
-            background: isLightning ? LIGHTNING_GRADIENT : FIRE_GRADIENT,
+            background: POP_TEXT_GRADIENT[variant],
             WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
           }}
         >
@@ -373,7 +400,7 @@ function AppContent() {
   const [celebrating, setCelebrating] = useState<{ id: string; level: 1 | 2 } | null>(null);
   const [fever, setFever] = useState(false);
   const [streakMsg, setStreakMsg] = useState<{
-    id: string; text: string; variant?: 'fire' | 'lightning';
+    id: string; text: string; variant?: PopVariant;
   } | null>(null);
   const [timeDialogHabit, setTimeDialogHabit] = useState<Habit | null>(null);
   const [accountMenuAnchor, setAccountMenuAnchor] = useState<null | HTMLElement>(null);
@@ -579,6 +606,17 @@ function AppContent() {
       setFever(true);
       setTimeout(() => setFever(false), FEVER_MS);
     }
+    // 自分の表示時間が終わったら消す(次のポップに切り替わっていたら触らない)
+    const showPop = (msg: { id: string; text: string; variant?: PopVariant }, ms: number) => {
+      setStreakMsg(msg);
+      setTimeout(() => setStreakMsg(cur => (cur === msg ? null : cur)), ms);
+    };
+
+    // 達成 → ばっちり達成: がんばりを褒める一言(振動はタップ時のばっちり用パターンで十分)
+    if (current === 1 && nextIntensity === 2) {
+      showPop({ id: habit.id, text: pickBacchiriPraise(), variant: 'rainbow' }, 1600);
+    }
+
     // First completion of the day: shout out the streak it extends
     if (current === 0 && nextIntensity === 1) {
       const before = new Set((completionsByHabit.get(habit.id) ?? new Map<string, number>()).keys());
@@ -589,11 +627,6 @@ function AppContent() {
         : newStreak > bestStreak(before)
           ? `自己ベスト更新！ ${newStreak}日連続🔥`
           : `${newStreak}日連続！🔥`;
-      // 自分の表示時間が終わったら消す(次のポップに切り替わっていたら触らない)
-      const showPop = (msg: { id: string; text: string; variant?: 'fire' | 'lightning' }, ms: number) => {
-        setStreakMsg(msg);
-        setTimeout(() => setStreakMsg(cur => (cur === msg ? null : cur)), ms);
-      };
       const showStreak = () => {
         if (!streakText) return;
         showPop({ id: habit.id, text: streakText }, 1600);
