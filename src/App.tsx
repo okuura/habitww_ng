@@ -266,7 +266,7 @@ const LIGHTNING_GRADIENT = 'linear-gradient(180deg, #fff59d 0%, #ffffff 40%, #4f
 // Flowing fire for the streak chip (same mechanism as the all-clear rainbow chip)
 const FIRE_FLOW = 'linear-gradient(90deg, #ff3d00, #ff9100, #ffd740, #ff9100, #ff3d00, #d50000, #ff3d00)';
 
-function StreakPop({ text, sub, variant = 'fire' }: { text: string; sub?: string; variant?: 'fire' | 'lightning' }) {
+function StreakPop({ text, variant = 'fire' }: { text: string; variant?: 'fire' | 'lightning' }) {
   const isLightning = variant === 'lightning';
   return (
     <Box
@@ -297,11 +297,6 @@ function StreakPop({ text, sub, variant = 'fire' }: { text: string; sub?: string
           {text}
         </Box>
       </Box>
-      {sub && (
-        <Box sx={{ mt: 0.5, textAlign: 'center', color: '#fff', fontWeight: 800, fontSize: '0.85rem', opacity: 0.9 }}>
-          {sub}
-        </Box>
-      )}
     </Box>
   );
 }
@@ -374,7 +369,7 @@ function AppContent() {
   const [celebrating, setCelebrating] = useState<{ id: string; level: 1 | 2 } | null>(null);
   const [fever, setFever] = useState(false);
   const [streakMsg, setStreakMsg] = useState<{
-    id: string; text: string; sub?: string; variant?: 'fire' | 'lightning';
+    id: string; text: string; variant?: 'fire' | 'lightning';
   } | null>(null);
   const [timeDialogHabit, setTimeDialogHabit] = useState<Habit | null>(null);
   const [accountMenuAnchor, setAccountMenuAnchor] = useState<null | HTMLElement>(null);
@@ -590,15 +585,23 @@ function AppContent() {
         : newStreak > bestStreak(before)
           ? `自己ベスト更新！ ${newStreak}日連続🔥`
           : `${newStreak}日連続！🔥`;
-      if (onTime) {
-        // 時間どおりが主役。連続記録は 2 行目に添える
-        setStreakMsg({ id: habit.id, text: '時間どおり！', sub: streakText ?? undefined, variant: 'lightning' });
-        setTimeout(() => setStreakMsg(null), 1900);
-        if (canVibrate) navigator.vibrate([30, 20, 30, 20, 150]);
-      } else if (streakText) {
-        setStreakMsg({ id: habit.id, text: streakText });
-        setTimeout(() => setStreakMsg(null), 1600);
+      // 自分の表示時間が終わったら消す(次のポップに切り替わっていたら触らない)
+      const showPop = (msg: { id: string; text: string; variant?: 'fire' | 'lightning' }, ms: number) => {
+        setStreakMsg(msg);
+        setTimeout(() => setStreakMsg(cur => (cur === msg ? null : cur)), ms);
+      };
+      const showStreak = () => {
+        if (!streakText) return;
+        showPop({ id: habit.id, text: streakText }, 1600);
         if (canVibrate) navigator.vibrate([20, 30, 110]);
+      };
+      if (onTime) {
+        // 「時間どおり！」→ 連続記録 の順に 1 枚ずつ見せる
+        showPop({ id: habit.id, text: '時間どおり！', variant: 'lightning' }, 1900);
+        if (canVibrate) navigator.vibrate([30, 20, 30, 20, 150]);
+        setTimeout(showStreak, 1750);
+      } else {
+        showStreak();
       }
     }
 
@@ -918,7 +921,7 @@ function AppContent() {
                       }}
                     >
                       {streakMsg?.id === habit.id && (
-                        <StreakPop text={streakMsg.text} sub={streakMsg.sub} variant={streakMsg.variant} />
+                        <StreakPop key={streakMsg.text} text={streakMsg.text} variant={streakMsg.variant} />
                       )}
                       <CardContent sx={{ pb: 0.5, pt: 1.5, px: 2 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
