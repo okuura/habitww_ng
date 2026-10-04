@@ -17,5 +17,7 @@ interface Window {
   HabitwwNative?: {
     platform: 'ios';
     openSettings: () => void;
+    /** 古いアプリには無い */
+    requestNotificationPermission?: () => void;
   };
 }

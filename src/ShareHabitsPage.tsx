@@ -202,6 +202,7 @@ export default function ShareHabitsPage({ user, onScanQR }: ShareHabitsPageProps
           {sharedViews.map(view => {
             const datesSet = new Set(view.completions.map(c => c.completed_date));
             const dateMap = new Map(view.completions.map(c => [c.completed_date, c.intensity]));
+            const onTimeDates = new Set(view.completions.filter(c => c.on_time).map(c => c.completed_date));
             const streak = calcStreak(datesSet);
             const totalCount = datesSet.size;
             const doneToday = datesSet.has(todayStr);
@@ -286,7 +287,7 @@ export default function ShareHabitsPage({ user, onScanQR }: ShareHabitsPageProps
                     </Box>
                   </Box>
 
-                  <ActivityGrid completionsByDate={dateMap} habitColor={view.habit.color} />
+                  <ActivityGrid completionsByDate={dateMap} onTimeDates={onTimeDates} habitColor={view.habit.color} />
                 </CardContent>
               </Card>
             );

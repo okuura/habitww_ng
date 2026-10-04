@@ -44,6 +44,9 @@ import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ShareIcon from '@mui/icons-material/Share';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import NotificationsIcon from '@mui/icons-material/Notifications';
+import BoltIcon from '@mui/icons-material/Bolt';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
 import { alpha, darken, lighten } from '@mui/material/styles';
@@ -68,6 +71,7 @@ import LoginPage from './LoginPage';
 
 const StatsPage = lazy(() => import('./StatsPage'));
 const ShareModal = lazy(() => import('./ShareModal'));
+const HabitTimeDialog = lazy(() => import('./HabitTimeDialog'));
 const QRScannerDialog = lazy(() => import('./QRScannerDialog'));
 const ShareHabitsPage = lazy(() => import('./ShareHabitsPage'));
 
@@ -257,10 +261,13 @@ const streakSlam = keyframes`
 `;
 
 const FIRE_GRADIENT = 'linear-gradient(180deg, #ffd54f 0%, #ff7043 45%, #d32f2f 100%)';
+// 疾風迅雷: 電光(黄 → 白 → 水色)
+const LIGHTNING_GRADIENT = 'linear-gradient(180deg, #fff59d 0%, #ffffff 40%, #4fc3f7 100%)';
 // Flowing fire for the streak chip (same mechanism as the all-clear rainbow chip)
 const FIRE_FLOW = 'linear-gradient(90deg, #ff3d00, #ff9100, #ffd740, #ff9100, #ff3d00, #d50000, #ff3d00)';
 
-function StreakPop({ text }: { text: string }) {
+function StreakPop({ text, sub, variant = 'fire' }: { text: string; sub?: string; variant?: 'fire' | 'lightning' }) {
+  const isLightning = variant === 'lightning';
   return (
     <Box
       sx={{
@@ -268,23 +275,52 @@ function StreakPop({ text }: { text: string }) {
         whiteSpace: 'nowrap',
         px: 2.5, py: 1.25, borderRadius: 3,
         bgcolor: 'rgba(0,0,0,0.62)', backdropFilter: 'blur(4px)',
-        boxShadow: '0 0 28px rgba(255,87,34,0.55), 0 6px 20px rgba(0,0,0,0.35)',
-        animation: `${streakSlam} 1.6s cubic-bezier(0.2, 0.9, 0.3, 1) forwards`,
+        boxShadow: isLightning
+          ? '0 0 32px rgba(79,195,247,0.7), 0 0 12px rgba(255,241,118,0.6), 0 6px 20px rgba(0,0,0,0.35)'
+          : '0 0 28px rgba(255,87,34,0.55), 0 6px 20px rgba(0,0,0,0.35)',
+        animation: `${streakSlam} ${isLightning ? 1.9 : 1.6}s cubic-bezier(0.2, 0.9, 0.3, 1) forwards`,
       }}
     >
-      <Box
-        sx={{
-          fontFamily: '"Dela Gothic One", "Hiragino Sans", "Noto Sans JP", sans-serif',
-          fontSize: '1.7rem', lineHeight: 1.1, textAlign: 'center',
-          background: FIRE_GRADIENT,
-          WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
-          filter: 'drop-shadow(0 2px 0 rgba(0,0,0,0.4))',
-        }}
-      >
-        {text}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+        {isLightning && (
+          <BoltIcon sx={{ fontSize: '2rem', color: '#ffeb3b', filter: 'drop-shadow(0 0 6px rgba(79,195,247,0.9))' }} />
+        )}
+        <Box
+          sx={{
+            fontFamily: '"Dela Gothic One", "Hiragino Sans", "Noto Sans JP", sans-serif',
+            fontSize: '1.7rem', lineHeight: 1.1, textAlign: 'center',
+            background: isLightning ? LIGHTNING_GRADIENT : FIRE_GRADIENT,
+            WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
+            filter: 'drop-shadow(0 2px 0 rgba(0,0,0,0.4))',
+          }}
+        >
+          {text}
+        </Box>
       </Box>
+      {sub && (
+        <Box sx={{ mt: 0.5, textAlign: 'center', color: '#fff', fontWeight: 800, fontSize: '0.85rem', opacity: 0.9 }}>
+          {sub}
+        </Box>
+      )}
     </Box>
   );
+}
+
+/** 疾風迅雷: 実施時間 + 10 分までに達成したか(それより前の達成も含む) */
+const ON_TIME_GRACE_MIN = 10;
+function isOnTime(habit: Habit, now: Date): boolean {
+  if (!habit.scheduled_time) return false;
+  const [h, m] = habit.scheduled_time.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return false;
+  const deadline = new Date(now);
+  deadline.setHours(h, m + ON_TIME_GRACE_MIN, 0, 0);
+  return now.getTime() <= deadline.getTime();
+}
+
+/** "07:05:00" → "7:05" */
+function formatScheduledTime(time: string): string {
+  const [h, m] = time.split(':');
+  return `${Number(h)}:${m}`;
 }
 
 function calculateStreak(completedDates: Set<string>): number {
@@ -337,7 +373,10 @@ function AppContent() {
   const [toggling, setToggling] = useState<string | null>(null);
   const [celebrating, setCelebrating] = useState<{ id: string; level: 1 | 2 } | null>(null);
   const [fever, setFever] = useState(false);
-  const [streakMsg, setStreakMsg] = useState<{ id: string; text: string } | null>(null);
+  const [streakMsg, setStreakMsg] = useState<{
+    id: string; text: string; sub?: string; variant?: 'fire' | 'lightning';
+  } | null>(null);
+  const [timeDialogHabit, setTimeDialogHabit] = useState<Habit | null>(null);
   const [accountMenuAnchor, setAccountMenuAnchor] = useState<null | HTMLElement>(null);
   const [deleteAccountDialogOpen, setDeleteAccountDialogOpen] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
@@ -505,9 +544,14 @@ function AppContent() {
   const completedToday = new Set(todayIntensity.keys());
 
   const completionsByHabit = new Map<string, Map<string, number>>();
+  const onTimeByHabit = new Map<string, Set<string>>();
   for (const c of completions) {
     if (!completionsByHabit.has(c.habit_id)) completionsByHabit.set(c.habit_id, new Map());
     completionsByHabit.get(c.habit_id)!.set(c.completed_date, c.intensity);
+    if (c.on_time) {
+      if (!onTimeByHabit.has(c.habit_id)) onTimeByHabit.set(c.habit_id, new Set());
+      onTimeByHabit.get(c.habit_id)!.add(c.completed_date);
+    }
   }
 
   const handleToggle = async (habit: Habit) => {
@@ -520,6 +564,9 @@ function AppContent() {
     const wasAllDone = habits.length > 0 && habits.every(h => completedToday.has(h.id));
     const willBeAllDone = habits.length > 0 && nextIntensity > 0
       && habits.every(h => h.id === habit.id || completedToday.has(h.id));
+
+    // 疾風迅雷: その日の最初の達成が実施時間 + 10 分以内か
+    const onTime = current === 0 && nextIntensity === 1 && isOnTime(habit, new Date());
 
     // Feedback fires immediately on tap — never wait for the network
     const canVibrate = typeof navigator !== 'undefined' && !!navigator.vibrate;
@@ -539,11 +586,17 @@ function AppContent() {
       const after = new Set(before);
       after.add(todayStr);
       const newStreak = calculateStreak(after);
-      if (newStreak >= 2) {
-        const text = newStreak > bestStreak(before)
+      const streakText = newStreak < 2 ? null
+        : newStreak > bestStreak(before)
           ? `自己ベスト更新！ ${newStreak}日連続🔥`
           : `${newStreak}日連続！🔥`;
-        setStreakMsg({ id: habit.id, text });
+      if (onTime) {
+        // 時間どおりが主役。連続記録は 2 行目に添える
+        setStreakMsg({ id: habit.id, text: '時間どおり！', sub: streakText ?? undefined, variant: 'lightning' });
+        setTimeout(() => setStreakMsg(null), 1900);
+        if (canVibrate) navigator.vibrate([30, 20, 30, 20, 150]);
+      } else if (streakText) {
+        setStreakMsg({ id: habit.id, text: streakText });
         setTimeout(() => setStreakMsg(null), 1600);
         if (canVibrate) navigator.vibrate([20, 30, 110]);
       }
@@ -559,6 +612,8 @@ function AppContent() {
           completed_date: todayStr,
           created_at: new Date().toISOString(),
           intensity: nextIntensity,
+          // 1→2 では元の on_time を引き継ぐ(DB 側も intensity だけ更新する)
+          on_time: current === 0 ? onTime : prev.find(c => c.habit_id === habit.id && c.completed_date === todayStr)?.on_time,
         });
       }
       return next;
@@ -573,7 +628,7 @@ function AppContent() {
     } else if (current === 0) {
       await supabase
         .from('habit_completions')
-        .insert({ habit_id: habit.id, completed_date: todayStr, intensity: nextIntensity });
+        .insert({ habit_id: habit.id, completed_date: todayStr, intensity: nextIntensity, on_time: onTime });
     } else {
       await supabase
         .from('habit_completions')
@@ -625,6 +680,23 @@ function AppContent() {
     setDeleteAccountDialogOpen(false);
     setHabits([]);
     setCompletions([]);
+  };
+
+  const handleSaveHabitTime = async (habit: Habit, time: string | null, notify: boolean) => {
+    const scheduled_time = time ? `${time}:00` : null;
+    setHabits(prev => prev.map(h => h.id === habit.id ? { ...h, scheduled_time, notify_enabled: notify } : h));
+    setTimeDialogHabit(null);
+    const { error } = await supabase
+      .from('habits')
+      .update({ scheduled_time, notify_enabled: notify })
+      .eq('id', habit.id);
+    if (error) {
+      setSnackbarMsg('実施時間を保存できませんでした');
+      await fetchData();
+      return;
+    }
+    if (notify) window.HabitwwNative?.requestNotificationPermission?.();
+    setSnackbarMsg(time ? `実施時間を ${formatScheduledTime(scheduled_time!)} に設定しました` : '実施時間を削除しました');
   };
 
   const handleRenameHabit = async (habitId: string) => {
@@ -845,7 +917,9 @@ function AppContent() {
                         } : {}),
                       }}
                     >
-                      {streakMsg?.id === habit.id && <StreakPop text={streakMsg.text} />}
+                      {streakMsg?.id === habit.id && (
+                        <StreakPop text={streakMsg.text} sub={streakMsg.sub} variant={streakMsg.variant} />
+                      )}
                       <CardContent sx={{ pb: 0.5, pt: 1.5, px: 2 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
                           <Box
@@ -879,6 +953,26 @@ function AppContent() {
                             >
                               {habit.name}
                             </Typography>
+                          )}
+                          {habit.scheduled_time && editingHabitId !== habit.id && (
+                            <Chip
+                              icon={<AccessTimeIcon sx={{ fontSize: '0.85rem !important' }} />}
+                              label={
+                                <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.25 }}>
+                                  {formatScheduledTime(habit.scheduled_time)}
+                                  {habit.notify_enabled && <NotificationsIcon sx={{ fontSize: '0.75rem' }} />}
+                                </Box>
+                              }
+                              size="small"
+                              variant="outlined"
+                              onClick={() => setTimeDialogHabit(habit)}
+                              sx={{
+                                height: 20, fontSize: '0.68rem', fontWeight: 700,
+                                color: 'text.secondary', borderColor: 'divider', flexShrink: 0,
+                                '& .MuiChip-icon': { color: 'text.secondary', ml: '4px' },
+                                '& .MuiChip-label': { px: '6px' },
+                              }}
+                            />
                           )}
 
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -938,6 +1032,7 @@ function AppContent() {
 
                         <ActivityGrid
                           completionsByDate={dateMap}
+                          onTimeDates={onTimeByHabit.get(habit.id)}
                           habitColor={habit.color}
                           onYesterdayClick={() => setYesterdayHabitTarget(habit.id)}
                         />
@@ -1073,6 +1168,28 @@ function AppContent() {
                 共有中 — タップでQRを表示
               </Typography>
             )}
+          </Box>
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            const target = habits.find(h => h.id === habitMenuTarget);
+            setHabitMenuAnchor(null);
+            setHabitMenuTarget(null);
+            if (target) setTimeDialogHabit(target);
+          }}
+          sx={{ gap: 1.5, py: 1.25 }}
+        >
+          <AccessTimeIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+          <Box>
+            <Typography variant="body2">実施時間</Typography>
+            {(() => {
+              const target = habits.find(h => h.id === habitMenuTarget);
+              return target?.scheduled_time ? (
+                <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: -0.25 }}>
+                  {formatScheduledTime(target.scheduled_time)}{target.notify_enabled ? ' ・通知オン' : ''}
+                </Typography>
+              ) : null;
+            })()}
           </Box>
         </MenuItem>
         <Divider />
@@ -1273,6 +1390,18 @@ function AppContent() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* 実施時間ダイアログ */}
+      {timeDialogHabit && (
+        <Suspense fallback={null}>
+          <HabitTimeDialog
+            key={timeDialogHabit.id}
+            habit={timeDialogHabit}
+            onClose={() => setTimeDialogHabit(null)}
+            onSave={(time, notify) => handleSaveHabitTime(timeDialogHabit, time, notify)}
+          />
+        </Suspense>
+      )}
 
       {/* Share Modal (QR code display) */}
       {shareModalHabit && user && (

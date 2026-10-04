@@ -5,6 +5,7 @@ import { useRef, useEffect, useState } from 'react';
 
 interface ActivityGridProps {
   completionsByDate: Map<string, number>; // date -> intensity (1|2)
+  onTimeDates?: Set<string>; // 疾風迅雷: 実施時間どおりに達成した日(稲妻マーク)
   habitColor: string;
   onYesterdayClick?: () => void;
 }
@@ -63,7 +64,23 @@ function toLocalDateString(date: Date): string {
 
 const INTENSITY_LABELS = ['', '達成', 'ばっちり達成'];
 
-export default function ActivityGrid({ completionsByDate, habitColor, onYesterdayClick }: ActivityGridProps) {
+/** 疾風迅雷のマス用の小さな稲妻(11px のセルに収まる) */
+function BoltMark() {
+  return (
+    <Box
+      component="svg"
+      viewBox="0 0 24 24"
+      sx={{
+        width: 9, height: 9, display: 'block', pointerEvents: 'none',
+        filter: 'drop-shadow(0 0 1px rgba(0,0,0,0.55))',
+      }}
+    >
+      <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z" fill="#fff59d" stroke="#ff8f00" strokeWidth="1.5" strokeLinejoin="round" />
+    </Box>
+  );
+}
+
+export default function ActivityGrid({ completionsByDate, onTimeDates, habitColor, onYesterdayClick }: ActivityGridProps) {
   const theme = useTheme();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const todayCellRef = useRef<HTMLDivElement>(null);
@@ -191,6 +208,7 @@ export default function ActivityGrid({ completionsByDate, habitColor, onYesterda
                   const isOutsideYear = day.getFullYear() !== year;
                   const intensity = completionsByDate.get(dateStr) ?? 0;
                   const isCompleted = intensity > 0;
+                  const isOnTime = isCompleted && !!onTimeDates?.has(dateStr);
                   const isToday = dateStr === toLocalDateString(today);
                   const yesterday = new Date(today);
                   yesterday.setDate(yesterday.getDate() - 1);
@@ -217,7 +235,9 @@ export default function ActivityGrid({ completionsByDate, habitColor, onYesterda
                     cellBorder = 'none';
                   }
 
-                  const intensityLabel = isCompleted ? ` - ${INTENSITY_LABELS[intensity]}` : '';
+                  const intensityLabel = isCompleted
+                    ? ` - ${INTENSITY_LABELS[intensity]}${isOnTime ? ' ⚡時間どおり' : ''}`
+                    : '';
                   const tooltip = isOutsideYear
                     ? ''
                     : `${dateStr}${intensityLabel}${isYesterdayClickable ? ' (タップで登録)' : ''}`;
@@ -248,11 +268,16 @@ export default function ActivityGrid({ completionsByDate, habitColor, onYesterda
                           duration: theme.transitions.duration.shorter,
                         }),
                         flexShrink: 0,
+                        ...(isOnTime && {
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }),
                         ...(isYesterdayClickable && {
                           '&:hover': { backgroundColor: alpha(habitColor, 0.3) },
                         }),
                       }}
-                    />
+                    >
+                      {isOnTime && <BoltMark />}
+                    </Box>
                   );
                 })}
               </Box>

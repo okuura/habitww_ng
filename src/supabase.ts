@@ -76,6 +76,8 @@ export interface Habit {
   name: string;
   color: string;
   created_at: string;
+  scheduled_time?: string | null; // 実施時間 "HH:MM:SS"(ローカル時刻)
+  notify_enabled?: boolean; // 実施時間に通知する(iOS アプリ版のみ)
 }
 
 export interface HabitCompletion {
@@ -84,6 +86,7 @@ export interface HabitCompletion {
   completed_date: string;
   created_at: string;
   intensity: number; // 1=達成, 2=ばっちり達成
+  on_time?: boolean; // 疾風迅雷: 実施時間 + 10 分以内に達成
 }
 
 export interface HabitShare {
