@@ -251,13 +251,14 @@ function bestStreak(completedDates: Set<string>): number {
 }
 
 // "N日連続！" slammed onto the middle of the card when today's tap extends the streak
+// 左下 → 右上へ斜めに(-14deg)。叩きつけの揺れはこの角度を中心に
 const streakSlam = keyframes`
-  0%   { transform: translate(-50%, -50%) scale(2.8) rotate(-4deg); opacity: 0; filter: blur(4px); }
-  18%  { transform: translate(-50%, -50%) scale(0.92) rotate(1deg); opacity: 1; filter: blur(0); }
-  28%  { transform: translate(-50%, -50%) scale(1.1) rotate(-1deg); }
-  38%  { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
-  80%  { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
-  100% { transform: translate(-50%, -50%) scale(1.2) rotate(0deg); opacity: 0; }
+  0%   { transform: translate(-50%, -50%) scale(2.8) rotate(-18deg); opacity: 0; filter: blur(4px); }
+  18%  { transform: translate(-50%, -50%) scale(0.92) rotate(-13deg); opacity: 1; filter: blur(0); }
+  28%  { transform: translate(-50%, -50%) scale(1.1) rotate(-15deg); }
+  38%  { transform: translate(-50%, -50%) scale(1) rotate(-14deg); }
+  80%  { transform: translate(-50%, -50%) scale(1) rotate(-14deg); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1.2) rotate(-14deg); opacity: 0; }
 `;
 
 const FIRE_GRADIENT = 'linear-gradient(180deg, #ffd54f 0%, #ff7043 45%, #d32f2f 100%)';
@@ -273,25 +274,28 @@ function StreakPop({ text, variant = 'fire' }: { text: string; variant?: 'fire' 
       sx={{
         position: 'absolute', left: '50%', top: '50%', zIndex: 25, pointerEvents: 'none',
         whiteSpace: 'nowrap',
-        px: 2.5, py: 1.25, borderRadius: 3,
-        bgcolor: 'rgba(0,0,0,0.62)', backdropFilter: 'blur(4px)',
-        boxShadow: isLightning
-          ? '0 0 32px rgba(79,195,247,0.7), 0 0 12px rgba(255,241,118,0.6), 0 6px 20px rgba(0,0,0,0.35)'
-          : '0 0 28px rgba(255,87,34,0.55), 0 6px 20px rgba(0,0,0,0.35)',
         animation: `${streakSlam} ${isLightning ? 1.9 : 1.6}s cubic-bezier(0.2, 0.9, 0.3, 1) forwards`,
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+      <Box
+        sx={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5,
+          // 背景の帯なしでも読めるよう、濃い縁取り + 色付きの光彩。
+          // background-clip: text の要素自体に filter をかけると WebKit で崩れることがあるので外側に置く
+          filter: isLightning
+            ? 'drop-shadow(0 0 1px rgba(0,0,0,0.9)) drop-shadow(0 2px 2px rgba(0,0,0,0.6)) drop-shadow(0 0 10px rgba(79,195,247,0.85))'
+            : 'drop-shadow(0 0 1px rgba(0,0,0,0.9)) drop-shadow(0 2px 2px rgba(0,0,0,0.6)) drop-shadow(0 0 10px rgba(255,87,34,0.8))',
+        }}
+      >
         {isLightning && (
-          <BoltIcon sx={{ fontSize: '2rem', color: '#ffeb3b', filter: 'drop-shadow(0 0 6px rgba(79,195,247,0.9))' }} />
+          <BoltIcon sx={{ fontSize: '2rem', color: '#ffeb3b' }} />
         )}
         <Box
           sx={{
             fontFamily: '"Dela Gothic One", "Hiragino Sans", "Noto Sans JP", sans-serif',
-            fontSize: '1.7rem', lineHeight: 1.1, textAlign: 'center',
+            fontSize: '1.55rem', lineHeight: 1.1, textAlign: 'center',
             background: isLightning ? LIGHTNING_GRADIENT : FIRE_GRADIENT,
             WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
-            filter: 'drop-shadow(0 2px 0 rgba(0,0,0,0.4))',
           }}
         >
           {text}
