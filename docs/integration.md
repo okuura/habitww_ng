@@ -107,6 +107,38 @@ redirectTo: window.location.origin })` → Google 同意画面 →
 - 既知の制約: Google の同意画面に「ixpasrmsjgbmscnhmlsd.supabase.co に移動」と
   表示される。解消には Supabase カスタムドメイン(Pro プラン + アドオン、有料)が
   必要と判断し、現状は許容している
+- iOS アプリ(habitww-ios)では Redirect URLs に `habitww://auth-callback` も必要
+  (アプリが authorize への遷移を横取りして ASWebAuthenticationSession で開くため)
+
+### 認証(Apple / X)
+
+ログイン画面の「Appleでログイン」「X(旧Twitter)でログイン」も同じ
+`signInWithOAuth` の流れ(provider: `'apple'` / `'x'`)。コールバック URL は Google と同じ
+`https://ixpasrmsjgbmscnhmlsd.supabase.co/auth/v1/callback`。
+ログイン方法ごとに別アカウントになる(メールアドレスが一致する場合のみ Supabase が自動で同一ユーザーにまとめる)。
+
+**Apple**(Apple Developer Program の有料会員が必要)
+
+| 設定箇所 | 内容 |
+|---|---|
+| Apple Developer → Identifiers → App IDs | 任意の App ID(例 `life.pacelong.habitww`)で「Sign in with Apple」を有効化 |
+| Apple Developer → Identifiers → Services IDs | Services ID を作成(例 `life.pacelong.habitww.signin`)。Sign in with Apple を Configure: Primary App ID は上の App ID、Domains に `ixpasrmsjgbmscnhmlsd.supabase.co`、Return URLs に上記コールバック URL |
+| Apple Developer → Keys | 「Sign in with Apple」を有効にしたキーを作成し、`.p8` ファイルと Key ID を控える(.p8 は 1 回しかダウンロードできない) |
+| Supabase → Auth → Providers → Apple | 有効化。Client IDs に Services ID、Secret Key に .p8 から生成した client secret(JWT) |
+
+- client secret(JWT)は **最長 6 か月で失効** する。期限前に .p8 から作り直して Supabase に設定し直すこと
+  (失効すると Apple でログインできなくなる)
+- Apple はメールアドレスを非公開にできる(中継アドレスになる)。その場合 Google とは別アカウントになる
+
+**X(旧Twitter)**
+
+| 設定箇所 | 内容 |
+|---|---|
+| X Developer Portal → Project / App → User authentication settings | OAuth 2.0 を有効化。Type of App: Web App、Callback URI に上記コールバック URL、Website URL に `https://habitww.pacelong.life` |
+| X Developer Portal → Keys and tokens | OAuth 2.0 Client ID / Client Secret を控える |
+| Supabase → Auth → Providers → X / Twitter (OAuth 2.0) | 有効化し、Client ID / Secret を設定 |
+
+- X はメールアドレスを返さないことが多いため、基本的に Google とは別アカウントになる
 
 ## ローカル開発
 
