@@ -49,12 +49,16 @@ const APPLE_ICON = (
   </Box>
 );
 
-/** ログイン方法(Supabase → Authentication → Providers で各プロバイダの有効化が必要) */
-const LOGIN_PROVIDERS: { provider: Provider; label: string; icon: ReactNode }[] = [
-  { provider: 'google', label: 'Googleでログイン', icon: GOOGLE_ICON },
-  { provider: 'apple', label: 'Appleでログイン', icon: APPLE_ICON },
+/**
+ * ログイン方法(Supabase → Authentication → Providers で各プロバイダの有効化が必要)。
+ * enabled: false のものはボタンを出さない
+ */
+const LOGIN_PROVIDERS: { provider: Provider; label: string; icon: ReactNode; enabled: boolean }[] = [
+  { provider: 'google', label: 'Googleでログイン', icon: GOOGLE_ICON, enabled: true },
+  // Apple Developer Program 登録後に Supabase で有効化してから true にする(docs/integration.md)
+  { provider: 'apple', label: 'Appleでログイン', icon: APPLE_ICON, enabled: false },
   // X は OAuth 2.0 版('x')。'twitter' は旧 OAuth 1.0a
-  { provider: 'x', label: 'X（旧Twitter）でログイン', icon: X_ICON },
+  { provider: 'x', label: 'X（旧Twitter）でログイン', icon: X_ICON, enabled: true },
 ];
 
 export default function LoginPage() {
@@ -131,7 +135,7 @@ export default function LoginPage() {
         </Divider>
 
         <Stack spacing={1.5}>
-          {LOGIN_PROVIDERS.map(({ provider, label, icon }) => (
+          {LOGIN_PROVIDERS.filter(p => p.enabled).map(({ provider, label, icon }) => (
             <Button
               key={provider}
               fullWidth
