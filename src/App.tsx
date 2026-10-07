@@ -52,6 +52,14 @@ import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
 import { alpha, darken, lighten } from '@mui/material/styles';
 import { keyframes } from '@emotion/react';
 import type { User } from '@supabase/supabase-js';
+import {
+  DndContext, closestCenter, MouseSensor, TouchSensor, useSensor, useSensors,
+  type DragEndEvent, type DragOverEvent,
+} from '@dnd-kit/core';
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import { CSS } from '@dnd-kit/utilities';
+import type { ReactNode } from 'react';
 import theme from './theme';
 // Heavy display face for the streak pop (unicode-range subsets: only used glyphs load)
 import '@fontsource/dela-gothic-one';
@@ -397,6 +405,44 @@ function markOnTimeEarned(habitId: string, date: string): void {
   }
 }
 
+/** from → to へ動かした新しい並びと、sort_order を更新すべき習慣(位置が変わったもの)を返す */
+function reorderHabits(habits: Habit[], from: number, to: number): { ordered: Habit[]; changed: Habit[] } {
+  const ordered = arrayMove(habits, from, to).map((h, i) => ({ ...h, sort_order: i }));
+  const before = new Map(habits.map(h => [h.id, h.sort_order]));
+  return { ordered, changed: ordered.filter(h => before.get(h.id) !== h.sort_order) };
+}
+
+/** 長押しで浮き上がってドラッグできるカードの入れ物(「実施」ボタン側では止める) */
+function SortableHabit({ id, children }: { id: string; children: ReactNode }) {
+  const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id });
+  return (
+    <Box
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      sx={{
+        position: 'relative',
+        transform: CSS.Translate.toString(transform),
+        transition,
+        zIndex: isDragging ? 30 : 'auto',
+        outline: 'none',
+        // 長押ししても文字選択や iOS のメニューを出さない。浮き上がる前は普通にスクロールできる
+        userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none',
+        touchAction: 'manipulation',
+        '& > .MuiCard-root': {
+          transition: 'transform 180ms ease, box-shadow 180ms ease',
+          ...(isDragging ? {
+            transform: 'scale(1.03)',
+            boxShadow: '0 14px 36px rgba(0,0,0,0.35), 0 4px 12px rgba(0,0,0,0.2)',
+          } : {}),
+        },
+      }}
+    >
+      {children}
+    </Box>
+  );
+}
+
 /** "07:05:00" → "7:05" */
 function formatScheduledTime(time: string): string {
   const [h, m] = time.split(':');
@@ -514,7 +560,7 @@ function AppContent() {
     let data = preloaded ? await preloaded : null;
     if (!data) {
       const [{ data: habitsData }, { data: completionsData }] = await Promise.all([
-        supabase.from('habits').select('*').order('created_at', { ascending: true }),
+        supabase.from('habits').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: true }),
         supabase.from('habit_completions').select('*'),
       ]);
       data = { habits: habitsData ?? [], completions: completionsData ?? [] };
@@ -752,12 +798,42 @@ function AppContent() {
       name: newHabitName.trim(),
       color: newHabitColor,
       user_id: user.id,
+      // 新しい習慣は末尾に
+      sort_order: Math.max(-1, ...habits.map(h => h.sort_order ?? 0)) + 1,
     });
     setNewHabitName('');
     setNewHabitColor(HABIT_COLORS[0]);
     setDialogOpen(false);
     setSaving(false);
     await fetchData();
+  };
+
+  // 習慣カードの長押し → ドラッグで並べ替え
+  const dragSensors = useSensors(
+    // 動かさずに 350ms 押し続けたときだけ浮き上がる。それまでに 8px 以上動いたらスクロール扱い
+    useSensor(MouseSensor, { activationConstraint: { delay: 350, tolerance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 350, tolerance: 8 } }),
+  );
+  const vibrate = (pattern: number | number[]) => {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(pattern);
+  };
+  const handleDragOver = ({ active, over }: DragOverEvent) => {
+    if (over && over.id !== active.id) vibrate(8);
+  };
+  const handleDragEnd = async ({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id) return;
+    const from = habits.findIndex(h => h.id === active.id);
+    const to = habits.findIndex(h => h.id === over.id);
+    if (from < 0 || to < 0) return;
+    const { ordered, changed } = reorderHabits(habits, from, to);
+    setHabits(ordered);
+    const results = await Promise.all(changed.map(h =>
+      supabase.from('habits').update({ sort_order: h.sort_order }).eq('id', h.id),
+    ));
+    if (results.some(r => r.error)) {
+      setSnackbarMsg('並び順を保存できませんでした');
+      await fetchData();
+    }
   };
 
   const handleDeleteHabit = async () => {
@@ -986,6 +1062,15 @@ function AppContent() {
                 </Button>
               </Box>
             ) : (
+              <DndContext
+                sensors={dragSensors}
+                collisionDetection={closestCenter}
+                modifiers={[restrictToVerticalAxis]}
+                onDragStart={() => vibrate(15)}
+                onDragOver={handleDragOver}
+                onDragEnd={handleDragEnd}
+              >
+              <SortableContext items={habits.map(h => h.id)} strategy={verticalListSortingStrategy}>
               <Stack spacing={1.5}>
                 {habits.map(habit => {
                   const dateMap = completionsByHabit.get(habit.id) ?? new Map<string, number>();
@@ -998,8 +1083,8 @@ function AppContent() {
                   const paperBg = paperColorFor(mode === 'dark' ? 'dark' : 'light');
 
                   return (
+                    <SortableHabit key={habit.id} id={habit.id}>
                     <Card
-                      key={habit.id}
                       elevation={0}
                       sx={{
                         position: 'relative',
@@ -1137,7 +1222,13 @@ function AppContent() {
                       </CardContent>
 
                       {/* disableSpacing: 紙吹雪(ConfettiBurst)が兄弟要素として入る間、ボタンに左余白 8px が付いて幅が縮むのを防ぐ */}
-                      <CardActions disableSpacing sx={{ px: 2, pb: 1.5, pt: 0.5, position: 'relative' }}>
+                      <CardActions
+                        disableSpacing
+                        // 「実施」ボタンの長押しではドラッグを始めない
+                        onTouchStart={e => e.stopPropagation()}
+                        onMouseDown={e => e.stopPropagation()}
+                        sx={{ px: 2, pb: 1.5, pt: 0.5, position: 'relative' }}
+                      >
                         {celebrating?.id === habit.id && (
                           <ConfettiBurst color={habit.color} count={celebrating.level === 2 ? CONFETTI_CONFIGS.length : 6} />
                         )}
@@ -1221,9 +1312,12 @@ function AppContent() {
                         })()}
                       </CardActions>
                     </Card>
+                    </SortableHabit>
                   );
                 })}
               </Stack>
+              </SortableContext>
+              </DndContext>
             )}
           </Container>
         )}

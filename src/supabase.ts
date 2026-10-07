@@ -57,7 +57,7 @@ let preloadedData: Promise<{ habits: Habit[]; completions: HabitCompletion[] } |
   initialSession.then(async ({ data: { session } }) => {
     if (!session?.user) return null;
     const [{ data: habits }, { data: completions }] = await Promise.all([
-      supabase.from('habits').select('*').order('created_at', { ascending: true }),
+      supabase.from('habits').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: true }),
       supabase.from('habit_completions').select('*'),
     ]);
     return { habits: habits ?? [], completions: completions ?? [] };
@@ -78,6 +78,7 @@ export interface Habit {
   created_at: string;
   scheduled_time?: string | null; // 実施時間 "HH:MM:SS"(ローカル時刻)
   notify_enabled?: boolean; // 実施時間に通知する(iOS アプリ版のみ)
+  sort_order?: number; // 表示順(小さい順)
 }
 
 export interface HabitCompletion {
