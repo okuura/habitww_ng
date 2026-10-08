@@ -1149,6 +1149,7 @@ function AppContent() {
                       color={habit.color}
                       intensity={currentIntensity}
                       paperBg={paperBg}
+                      dark={mode === 'dark'}
                       flipped={flippedIds.has(habit.id)}
                       backMounted={mountedBackIds.has(habit.id)}
                       onFlip={() => toggleFlip(habit.id)}

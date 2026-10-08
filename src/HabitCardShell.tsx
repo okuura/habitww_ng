@@ -1,45 +1,27 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import Box from '@mui/material/Box';
 import { alpha } from '@mui/material/styles';
 import { keyframes } from '@emotion/react';
 import type { Rarity } from './habitStats';
+import { FINISH } from './cardFinish';
 
-// 習慣カードの「器」: レアリティの枠と光沢、今日の達成の光、表裏の 3D 回転。
+// 習慣カードの「器」: 表裏の 3D 回転と、裏面の素材(レアリティ)。
+// 表面は習慣に集中できるよう今までどおりの素のカード。続けた証は裏面の金属の質感で見せる。
 // 中身(表面・裏面)は App から受け取る
 
 const RAINBOW = 'linear-gradient(90deg, #ff5f6d, #ffc371, #f9f871, #7cf29c, #5ad1ff, #a18cff, #ff7ad9, #ff5f6d)';
-const flow = keyframes`
-  0%   { background-position: 0% 50%, 0% 50%; }
-  100% { background-position: 0% 50%, 300% 50%; }
-`;
-const glowFlow = keyframes`
+const rainbowShift = keyframes`
   0%   { background-position: 0% 50%; }
   100% { background-position: 300% 50%; }
 `;
+// ホロの虹の層だけをゆっくり流す(下の 2 層は固定)
+const holoFlow = keyframes`
+  0%   { background-position: 0% 50%, 0 0, 0 0; }
+  100% { background-position: 300% 50%, 0 0, 0 0; }
+`;
 
-const FRAME: Record<Exclude<Rarity, 'normal'>, string> = {
-  silver: 'linear-gradient(135deg, #f5f7fa 0%, #aab3c0 22%, #ffffff 42%, #8a95a5 68%, #e6eaf0 100%)',
-  gold: 'linear-gradient(135deg, #fff6c8 0%, #d9a93a 22%, #fff3b0 42%, #a8790a 68%, #ffe27a 100%)',
-  holo: RAINBOW,
-};
-
-const SHEEN: Record<Rarity, string | null> = {
-  normal: null,
-  silver: 'linear-gradient(115deg, transparent 38%, rgba(255,255,255,0.16) 47%, rgba(255,255,255,0.05) 53%, transparent 62%)',
-  gold: 'linear-gradient(115deg, transparent 36%, rgba(255,236,170,0.22) 46%, rgba(255,255,255,0.08) 53%, transparent 64%)',
-  holo: 'linear-gradient(115deg, transparent 22%, rgba(255,95,109,0.16) 32%, rgba(249,248,113,0.16) 40%, rgba(255,255,255,0.28) 47%, rgba(90,209,255,0.18) 55%, rgba(161,140,255,0.18) 63%, transparent 76%)',
-};
-
-const STAMP: Record<Exclude<Rarity, 'normal'>, { label: string; bg: string; color: string }> = {
-  silver: { label: 'SILVER', bg: FRAME.silver, color: '#3d4652' },
-  gold: { label: '★ GOLD', bg: FRAME.gold, color: '#5a3d00' },
-  holo: { label: '✦ HOLO', bg: RAINBOW, color: '#ffffff' },
-};
-
-// ごく薄い紙の手触り(ノイズ)
-const NOISE = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E")`;
-
-const RADIUS = 14;
+// テーマの borderRadius 12 × 2(元の Card と同じ)
+const RADIUS = 24;
 
 // スクロールに合わせて光沢を動かす(全カードで 1 つのリスナーを共有)
 const shells = new Set<HTMLElement>();
@@ -67,6 +49,7 @@ interface HabitCardShellProps {
   intensity: number;
   /** カードの地の色(ライト/ダークで変わる) */
   paperBg: string;
+  dark: boolean;
   flipped: boolean;
   onFlip: () => void;
   front: ReactNode;
@@ -75,25 +58,9 @@ interface HabitCardShellProps {
   backMounted: boolean;
 }
 
-export default function HabitCardShell({ rarity, color, intensity, paperBg, flipped, onFlip, front, back, backMounted }: HabitCardShellProps) {
+export default function HabitCardShell({ rarity, color, intensity, paperBg, dark, flipped, onFlip, front, back, backMounted }: HabitCardShellProps) {
   const rootRef = useRef<HTMLDivElement>(null);
-  const frontRef = useRef<HTMLDivElement>(null);
-  const backRef = useRef<HTMLDivElement>(null);
   const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
-  const [heights, setHeights] = useState<{ front: number; back: number }>({ front: 0, back: 0 });
-
-  // 表と裏は重ねて置き、器の高さは見えている面に合わせる(裏面は長いのでカードが伸びる)
-  useLayoutEffect(() => {
-    const measure = () => setHeights({
-      front: frontRef.current?.offsetHeight ?? 0,
-      back: backRef.current?.offsetHeight ?? 0,
-    });
-    measure();
-    const ro = new ResizeObserver(measure);
-    if (frontRef.current) ro.observe(frontRef.current);
-    if (backRef.current) ro.observe(backRef.current);
-    return () => ro.disconnect();
-  }, [backMounted]);
 
   useEffect(() => {
     const el = rootRef.current;
@@ -124,44 +91,79 @@ export default function HabitCardShell({ rarity, color, intensity, paperBg, flip
 
   const handlePointerMove = (e: React.PointerEvent) => {
     const el = rootRef.current;
-    if (!el) return;
+    if (!el || !flipped) return;
     const r = el.getBoundingClientRect();
     el.style.setProperty('--sheen-x', String((e.clientX - r.left) / r.width));
   };
   const handlePointerLeave = () => rootRef.current?.style.removeProperty('--sheen-x');
 
-  const frame = rarity === 'normal' ? `linear-gradient(${alpha(color, 0.45)}, ${alpha(color, 0.45)})` : FRAME[rarity];
-  const sheen = SHEEN[rarity];
-  const visibleHeight = flipped ? heights.back : heights.front;
+  const finish = FINISH[rarity];
 
-  const faceSx = {
-    position: 'absolute' as const,
-    top: 0, left: 0, right: 0,
+  const faceBase = {
     borderRadius: `${RADIUS}px`,
-    border: '2px solid transparent',
-    background: `linear-gradient(${paperBg}, ${paperBg}) padding-box, ${frame} border-box`,
-    backgroundSize: '100% 100%, 300% 100%',
-    ...(rarity === 'holo' ? { animation: `${flow} 6s linear infinite` } : {}),
     backfaceVisibility: 'hidden' as const,
     WebkitBackfaceVisibility: 'hidden' as const,
-    // 面ごとに独立した 3D の層にする。これが無いと WebKit では、面の中の刻印や光沢(疑似要素)が
+    // 面ごとに独立した 3D の層にする。これが無いと WebKit では、面の中身が
     // 裏返したあとも左右反転して透けて見える
     transform: 'rotateY(0deg)',
-    // 紙の手触り
-    '&::before': {
-      content: '""', position: 'absolute', inset: 0, borderRadius: `${RADIUS - 2}px`, pointerEvents: 'none',
-      backgroundImage: NOISE, opacity: 0.06, mixBlendMode: 'overlay' as const,
-    },
-    // 光沢(指の位置 → なければスクロール位置に合わせて動く)
-    ...(sheen ? {
+  };
+
+  // 表面: 元の Card と同じ見た目。今日の達成で枠に色が付き、ばっちりは虹の枠
+  const frontSx = {
+    ...faceBase,
+    position: 'relative' as const,
+    bgcolor: paperBg,
+    border: '1px solid',
+    // ばっちり達成の虹枠(2px)に切り替わってもカードの大きさ・中身の位置が変わらないよう 1px 分を余白で確保
+    p: '1px',
+    borderColor: intensity === 0 ? 'divider' : alpha(color, 0.2 + intensity * 0.1),
+    transition: 'border-color 200ms, box-shadow 200ms',
+    boxShadow: intensity === 0 ? 'none' : `0 0 0 ${intensity + 1}px ${alpha(color, intensity * 0.08)}`,
+    ...(intensity === 2 ? {
+      border: '2px solid transparent',
+      p: 0,
+      background: `linear-gradient(${paperBg}, ${paperBg}) padding-box, ${RAINBOW} border-box`,
+      backgroundSize: '100% 100%, 300% 100%',
+      animation: `${rainbowShift} 3s linear infinite`,
+      boxShadow: dark ? '0 0 14px rgba(255,255,255,0.14)' : '0 2px 14px rgba(0,0,0,0.14)',
+    } : {}),
+    pointerEvents: flipped ? 'none' as const : 'auto' as const,
+  };
+
+  // 裏面: 表と同じ大きさ。中身が収まらないぶんは面の中でスクロールする
+  const backSx = {
+    ...faceBase,
+    position: 'absolute' as const,
+    inset: 0,
+    transform: 'rotateY(180deg)',
+    overflow: 'hidden',
+    pointerEvents: flipped ? 'auto' as const : 'none' as const,
+    ...(finish ? {
+      background: finish.background,
+      backgroundBlendMode: rarity === 'holo' ? 'soft-light, soft-light, normal' : 'soft-light, normal',
+      ...(rarity === 'holo' ? { backgroundSize: '300% 100%, 600px 300px, 100% 100%', animation: `${holoFlow} 8s linear infinite` } : {}),
+      color: finish.ink,
+      // 板の縁の面取り
+      boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.45), inset 0 -2px 4px rgba(60,40,0,0.25), inset 0 2px 3px rgba(255,255,255,0.35)',
+      // 内側の彫り線(刻印の枠)
+      '&::before': {
+        content: '""', position: 'absolute', inset: 7, borderRadius: `${RADIUS - 7}px`, pointerEvents: 'none', zIndex: 1,
+        border: `1.5px solid ${finish.line}`,
+        boxShadow: '1px 1px 0 rgba(255,255,255,0.55), inset 1px 1px 0 rgba(255,255,255,0.55)',
+      },
+      // 光沢(指の位置 → なければスクロール位置に合わせて動く)
       '&::after': {
-        content: '""', position: 'absolute', inset: 0, borderRadius: `${RADIUS - 2}px`, pointerEvents: 'none',
-        backgroundImage: sheen, backgroundSize: '300% 100%',
+        content: '""', position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 2,
+        backgroundImage: finish.sheen, backgroundSize: '300% 100%',
         backgroundPosition: 'calc(var(--sheen-x, var(--sheen-scroll, 0.5)) * 100%) 50%',
         transition: 'background-position 120ms linear',
-        zIndex: 2,
+        mixBlendMode: 'soft-light' as const,
       },
-    } : {}),
+    } : {
+      bgcolor: paperBg,
+      border: '1px solid',
+      borderColor: 'divider',
+    }),
   };
 
   return (
@@ -171,59 +173,29 @@ export default function HabitCardShell({ rarity, color, intensity, paperBg, flip
       onClick={handleTap}
       onPointerMove={handlePointerMove}
       onPointerLeave={handlePointerLeave}
-      sx={{
-        position: 'relative',
-        borderRadius: `${RADIUS}px`,
-        perspective: '1400px',
-        transition: 'height 450ms cubic-bezier(0.2, 0.8, 0.2, 1)',
-        // 今日の達成は枠の外側の光で表す(枠はレアリティ用)
-        ...(intensity === 1 ? { boxShadow: `0 0 0 1px ${alpha(color, 0.3)}, 0 0 14px ${alpha(color, 0.45)}` } : {}),
-      }}
-      style={{ height: visibleHeight || undefined }}
+      sx={{ position: 'relative', borderRadius: `${RADIUS}px`, perspective: '1400px' }}
     >
-      {intensity >= 2 && (
-        <Box
-          aria-hidden
-          sx={{
-            position: 'absolute', inset: -3, borderRadius: `${RADIUS + 3}px`, pointerEvents: 'none',
-            background: RAINBOW, backgroundSize: '300% 100%', filter: 'blur(7px)', opacity: 0.75,
-            animation: `${glowFlow} 3s linear infinite`,
-          }}
-        />
-      )}
       <Box
         sx={{
-          position: 'relative', height: '100%',
+          position: 'relative',
           transformStyle: 'preserve-3d',
           transition: 'transform 600ms cubic-bezier(0.3, 0.7, 0.2, 1)',
           transform: flipped ? 'rotateY(180deg)' : 'none',
         }}
       >
-        <Box ref={frontRef} sx={{ ...faceSx, pointerEvents: flipped ? 'none' : 'auto' }} aria-hidden={flipped}>
-          {rarity !== 'normal' && (
-            <Box
-              aria-hidden
-              sx={{
-                position: 'absolute', top: 0, right: 16, transform: 'translateY(-55%)', zIndex: 3,
-                px: 0.9, py: '1px', borderRadius: '6px',
-                background: STAMP[rarity].bg, backgroundSize: '200% 100%',
-                color: STAMP[rarity].color, fontSize: '0.55rem', fontWeight: 900, letterSpacing: '0.08em',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.35)', textShadow: rarity === 'holo' ? '0 1px 1px rgba(0,0,0,0.45)' : 'none',
-                pointerEvents: 'none', whiteSpace: 'nowrap',
-                backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden',
-              }}
-            >
-              {STAMP[rarity].label}
-            </Box>
-          )}
+        <Box sx={frontSx} aria-hidden={flipped}>
           {front}
         </Box>
-        <Box
-          ref={backRef}
-          sx={{ ...faceSx, transform: 'rotateY(180deg)', pointerEvents: flipped ? 'auto' : 'none' }}
-          aria-hidden={!flipped}
-        >
-          {backMounted && back}
+        <Box sx={backSx} aria-hidden={!flipped}>
+          <Box
+            sx={{
+              position: 'relative', zIndex: 3, height: '100%',
+              overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch',
+              scrollbarWidth: 'none', '&::-webkit-scrollbar': { display: 'none' },
+            }}
+          >
+            {backMounted && back}
+          </Box>
         </Box>
       </Box>
     </Box>
