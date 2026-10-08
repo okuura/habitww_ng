@@ -130,7 +130,7 @@ export default function HabitCardShell({ rarity, color, intensity, paperBg, dark
     pointerEvents: flipped ? 'none' as const : 'auto' as const,
   };
 
-  // 裏面: 表と同じ大きさ。中身が収まらないぶんは面の中でスクロールする
+  // 裏面: 表と同じ大きさ(中身はその中に収める)
   const backSx = {
     ...faceBase,
     position: 'absolute' as const,
@@ -140,7 +140,7 @@ export default function HabitCardShell({ rarity, color, intensity, paperBg, dark
     pointerEvents: flipped ? 'auto' as const : 'none' as const,
     ...(finish ? {
       background: finish.background,
-      backgroundBlendMode: rarity === 'holo' ? 'soft-light, soft-light, normal' : 'soft-light, normal',
+      backgroundBlendMode: rarity === 'holo' ? 'overlay, soft-light, normal' : 'soft-light, normal',
       ...(rarity === 'holo' ? { backgroundSize: '300% 100%, 600px 300px, 100% 100%', animation: `${holoFlow} 8s linear infinite` } : {}),
       color: finish.ink,
       // 板の縁の面取り
@@ -187,13 +187,7 @@ export default function HabitCardShell({ rarity, color, intensity, paperBg, dark
           {front}
         </Box>
         <Box sx={backSx} aria-hidden={!flipped}>
-          <Box
-            sx={{
-              position: 'relative', zIndex: 3, height: '100%',
-              overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch',
-              scrollbarWidth: 'none', '&::-webkit-scrollbar': { display: 'none' },
-            }}
-          >
+          <Box sx={{ position: 'relative', zIndex: 3, height: '100%' }}>
             {backMounted && back}
           </Box>
         </Box>

@@ -26,7 +26,7 @@ export interface CardFinish {
 // 横方向のヘアライン(ブラッシュ仕上げ)。横に長く縦に細かいノイズ
 const BRUSHED = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='300'%3E%3Cfilter id='b'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.002 1.4' numOctaves='2' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='1 0 0 0 0  1 0 0 0 0  1 0 0 0 0  0 0 0 0 0.3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23b)'/%3E%3C/svg%3E")`;
 
-const RAINBOW = 'linear-gradient(115deg, rgba(255,95,109,0.35), rgba(255,195,113,0.3), rgba(249,248,113,0.3), rgba(124,242,156,0.3), rgba(90,209,255,0.32), rgba(161,140,255,0.35), rgba(255,122,217,0.32))';
+const RAINBOW = 'linear-gradient(115deg, rgba(255,95,109,0.7), rgba(255,195,113,0.6), rgba(249,248,113,0.6), rgba(124,242,156,0.6), rgba(90,209,255,0.65), rgba(161,140,255,0.7), rgba(255,122,217,0.65), rgba(255,95,109,0.7))';
 
 const metal = (base: string, extra: string[] = []) =>
   [...extra, `${BRUSHED} 0 0 / 600px 300px`, base].join(', ');
