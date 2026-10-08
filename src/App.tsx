@@ -4,7 +4,6 @@ import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
-import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import CardActions from '@mui/material/CardActions';
 import Button from '@mui/material/Button';
@@ -43,6 +42,7 @@ import DarkModeIcon from '@mui/icons-material/DarkMode';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import ThreeSixtyIcon from '@mui/icons-material/ThreeSixty';
 import ShareIcon from '@mui/icons-material/Share';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import NotificationsIcon from '@mui/icons-material/Notifications';
@@ -67,14 +67,18 @@ import {
   supabase,
   initialSession,
   takePreloadedData,
+  fetchAppData,
   readCachedData,
   writeCachedData,
   clearCachedData,
   type Habit,
   type HabitCompletion,
   type HabitShare,
+  type HabitNote,
 } from './supabase';
 import ActivityGrid from './ActivityGrid';
+import HabitCardShell from './HabitCardShell';
+import { rarityOf } from './habitStats';
 import LoginPage from './LoginPage';
 
 const StatsPage = lazy(() => import('./StatsPage'));
@@ -82,6 +86,7 @@ const ShareModal = lazy(() => import('./ShareModal'));
 const HabitTimeDialog = lazy(() => import('./HabitTimeDialog'));
 const QRScannerDialog = lazy(() => import('./QRScannerDialog'));
 const ShareHabitsPage = lazy(() => import('./ShareHabitsPage'));
+const HabitCardBack = lazy(() => import('./HabitCardBack'));
 
 // Last known data, read once at startup. Lets the app paint real content
 // immediately (stale-while-revalidate) while auth + fresh data load.
@@ -429,7 +434,7 @@ function SortableHabit({ id, children }: { id: string; children: ReactNode }) {
         // 長押ししても文字選択や iOS のメニューを出さない。浮き上がる前は普通にスクロールできる
         userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none',
         touchAction: 'manipulation',
-        '& > .MuiCard-root': {
+        '& > .habit-card-shell': {
           transition: 'transform 180ms ease, box-shadow 180ms ease',
           ...(isDragging ? {
             transform: 'scale(1.03)',
@@ -491,6 +496,11 @@ function AppContent() {
   const [authLoading, setAuthLoading] = useState(true);
   const [habits, setHabits] = useState<Habit[]>(initialCache?.habits ?? []);
   const [completions, setCompletions] = useState<HabitCompletion[]>(initialCache?.completions ?? []);
+  const [notes, setNotes] = useState<Map<string, HabitNote>>(
+    () => new Map((initialCache?.notes ?? []).map(n => [n.habit_id, n])),
+  );
+  // 裏返し中の習慣カード
+  const [flippedIds, setFlippedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(initialCache === null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newHabitName, setNewHabitName] = useState('');
@@ -558,15 +568,10 @@ function AppContent() {
     // content stays visible while fresh data arrives.
     const preloaded = takePreloadedData();
     let data = preloaded ? await preloaded : null;
-    if (!data) {
-      const [{ data: habitsData }, { data: completionsData }] = await Promise.all([
-        supabase.from('habits').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: true }),
-        supabase.from('habit_completions').select('*'),
-      ]);
-      data = { habits: habitsData ?? [], completions: completionsData ?? [] };
-    }
+    if (!data) data = await fetchAppData();
     setHabits(data.habits);
     setCompletions(data.completions);
+    setNotes(new Map(data.notes.map(n => [n.habit_id, n])));
     setLoading(false);
   }, [user]);
 
@@ -576,10 +581,11 @@ function AppContent() {
     writeCachedData({
       habits,
       completions,
+      notes: [...notes.values()],
       userName: user.user_metadata?.name as string | undefined,
       userAvatar: user.user_metadata?.avatar_url as string | undefined,
     });
-  }, [habits, completions, loading, user]);
+  }, [habits, completions, notes, loading, user]);
 
   const fetchMyShares = useCallback(async () => {
     if (!user) return;
@@ -836,6 +842,60 @@ function AppContent() {
     }
   };
 
+  // 習慣カードの裏返し
+  const [mountedBackIds, setMountedBackIds] = useState<Set<string>>(new Set());
+  const toggleFlip = (habitId: string) => {
+    vibrate(12);
+    setMountedBackIds(prev => (prev.has(habitId) ? prev : new Set(prev).add(habitId)));
+    setFlippedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(habitId)) next.delete(habitId); else next.add(habitId);
+      return next;
+    });
+  };
+  const completionsOf = (habitId: string) => completions.filter(c => c.habit_id === habitId);
+
+  /** 裏面のメモ(なぜやるのか・理想の姿)を保存 */
+  const handleSaveNote = async (habitId: string, patch: { why?: string; ideal?: string }) => {
+    const current = notes.get(habitId) ?? { habit_id: habitId, why: '', ideal: '' };
+    const next: HabitNote = { ...current, ...patch };
+    setNotes(prev => new Map(prev).set(habitId, next));
+    const { error } = await supabase
+      .from('habit_notes')
+      .upsert({ habit_id: habitId, why: next.why, ideal: next.ideal, updated_at: new Date().toISOString() });
+    if (error) {
+      setSnackbarMsg('メモを保存できませんでした');
+      setNotes(prev => new Map(prev).set(habitId, current));
+    }
+  };
+
+  /** カード右上のボタン(裏返す ↻ と ︙ メニュー)。表と裏で共通 */
+  const cardButtons = (habitId: string, isShared: boolean) => (
+    <>
+      <IconButton
+        size="small"
+        aria-label="カードを裏返す"
+        onClick={() => toggleFlip(habitId)}
+        sx={{ color: 'text.disabled', '&:hover': { color: 'text.primary' }, ml: 0.25, p: 0.5 }}
+      >
+        <ThreeSixtyIcon sx={{ fontSize: '1.05rem' }} />
+      </IconButton>
+      <IconButton
+        size="small"
+        onClick={e => {
+          setHabitMenuAnchor(e.currentTarget);
+          setHabitMenuTarget(habitId);
+        }}
+        sx={{
+          color: isShared ? 'primary.main' : 'text.disabled',
+          '&:hover': { color: 'text.primary' },
+        }}
+      >
+        <MoreVertIcon fontSize="small" />
+      </IconButton>
+    </>
+  );
+
   const handleDeleteHabit = async () => {
     if (!deleteHabitTarget) return;
     await supabase.from('habits').delete().eq('id', deleteHabitTarget);
@@ -1084,32 +1144,34 @@ function AppContent() {
 
                   return (
                     <SortableHabit key={habit.id} id={habit.id}>
-                    <Card
-                      elevation={0}
-                      sx={{
-                        position: 'relative',
-                        border: '1px solid',
-                        // ばっちり達成の虹枠(2px)に切り替わってもカードの大きさ・中身の位置が変わらないよう 1px 分を余白で確保
-                        p: '1px',
-                        borderColor: currentIntensity === 0 ? 'divider' : alpha(habit.color, 0.2 + currentIntensity * 0.1),
-                        borderRadius: 2,
-                        transition: theme.transitions.create(['border-color', 'box-shadow'], {
-                          duration: theme.transitions.duration.shorter,
-                        }),
-                        boxShadow: currentIntensity === 0 ? 'none' : `0 0 0 ${currentIntensity + 1}px ${alpha(habit.color, currentIntensity * 0.08)}`,
-                        // Level 2: the card frame flows with the same rainbow as the button
-                        ...(currentIntensity === 2 ? {
-                          border: '2px solid transparent',
-                          p: 0,
-                          background: `linear-gradient(${paperBg}, ${paperBg}) padding-box, ${RAINBOW} border-box`,
-                          backgroundSize: '100% 100%, 300% 100%',
-                          animation: `${rainbowShift} 3s linear infinite`,
-                          boxShadow: mode === 'dark'
-                            ? '0 0 14px rgba(255,255,255,0.14)'
-                            : '0 2px 14px rgba(0,0,0,0.14)',
-                        } : {}),
-                      }}
-                    >
+                    <HabitCardShell
+                      rarity={rarityOf(totalCount).rarity}
+                      color={habit.color}
+                      intensity={currentIntensity}
+                      paperBg={paperBg}
+                      flipped={flippedIds.has(habit.id)}
+                      backMounted={mountedBackIds.has(habit.id)}
+                      onFlip={() => toggleFlip(habit.id)}
+                      back={
+                        <Suspense fallback={<Box sx={{ height: 240 }} />}>
+                          <HabitCardBack
+                            habit={habit}
+                            completions={completionsOf(habit.id)}
+                            note={notes.get(habit.id)}
+                            onSaveNote={patch => handleSaveNote(habit.id, patch)}
+                            header={
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: habit.color, flexShrink: 0 }} />
+                                <Typography variant="body1" sx={{ fontWeight: 700, flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
+                                  {habit.name}
+                                </Typography>
+                                {cardButtons(habit.id, isShared)}
+                              </Box>
+                            }
+                          />
+                        </Suspense>
+                      }
+                      front={<>
                       {streakMsg?.id === habit.id && (
                         <StreakPop key={streakMsg.text} text={streakMsg.text} variant={streakMsg.variant} />
                       )}
@@ -1139,6 +1201,7 @@ function AppContent() {
                           ) : (
                             <Typography
                               variant="body1"
+                              data-no-flip
                               onClick={() => { setEditingHabitId(habit.id); setEditingHabitName(habit.name); }}
                               sx={{
                                 fontWeight: 700, flex: 1, color: 'text.primary',
@@ -1195,21 +1258,7 @@ function AppContent() {
                             <Typography variant="caption" sx={{ color: 'text.secondary', minWidth: 40, textAlign: 'right' }}>
                               計 {totalCount}日
                             </Typography>
-                            {/* 3-dot menu button */}
-                            <IconButton
-                              size="small"
-                              onClick={e => {
-                                setHabitMenuAnchor(e.currentTarget);
-                                setHabitMenuTarget(habit.id);
-                              }}
-                              sx={{
-                                color: isShared ? 'primary.main' : 'text.disabled',
-                                '&:hover': { color: 'text.primary' },
-                                ml: 0.5,
-                              }}
-                            >
-                              <MoreVertIcon fontSize="small" />
-                            </IconButton>
+                            {cardButtons(habit.id, isShared)}
                           </Box>
                         </Box>
 
@@ -1311,7 +1360,8 @@ function AppContent() {
                           );
                         })()}
                       </CardActions>
-                    </Card>
+                      </>}
+                    />
                     </SortableHabit>
                   );
                 })}

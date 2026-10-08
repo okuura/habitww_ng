@@ -18,6 +18,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export interface CachedAppData {
   habits: Habit[];
   completions: HabitCompletion[];
+  /** 古いキャッシュには無い */
+  notes?: HabitNote[];
   userName?: string;
   userAvatar?: string;
 }
@@ -53,14 +55,26 @@ export function clearCachedData(): void {
 
 export const initialSession = supabase.auth.getSession();
 
-let preloadedData: Promise<{ habits: Habit[]; completions: HabitCompletion[] } | null> | null =
+export interface AppData {
+  habits: Habit[];
+  completions: HabitCompletion[];
+  notes: HabitNote[];
+}
+
+/** 習慣・記録・メモをまとめて取得する(メモのテーブルが無い/読めない場合は空として扱う) */
+export async function fetchAppData(): Promise<AppData> {
+  const [{ data: habits }, { data: completions }, { data: notes }] = await Promise.all([
+    supabase.from('habits').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: true }),
+    supabase.from('habit_completions').select('*'),
+    supabase.from('habit_notes').select('habit_id, why, ideal'),
+  ]);
+  return { habits: habits ?? [], completions: completions ?? [], notes: notes ?? [] };
+}
+
+let preloadedData: Promise<AppData | null> | null =
   initialSession.then(async ({ data: { session } }) => {
     if (!session?.user) return null;
-    const [{ data: habits }, { data: completions }] = await Promise.all([
-      supabase.from('habits').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: true }),
-      supabase.from('habit_completions').select('*'),
-    ]);
-    return { habits: habits ?? [], completions: completions ?? [] };
+    return fetchAppData();
   }).catch(() => null);
 
 /** One-shot: the first fetchData() consumes the eager fetch; later calls refetch. */
@@ -88,6 +102,13 @@ export interface HabitCompletion {
   created_at: string;
   intensity: number; // 1=達成, 2=ばっちり達成
   on_time?: boolean; // 疾風迅雷: 実施時間 + 10 分以内に達成
+}
+
+/** 習慣カードの裏面のメモ(本人だけが読み書きできる habit_notes テーブル) */
+export interface HabitNote {
+  habit_id: string;
+  why: string; // なぜやるのか
+  ideal: string; // 理想の姿(一言)
 }
 
 export interface HabitShare {

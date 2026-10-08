@@ -247,6 +247,7 @@ export default function ActivityGrid({ completionsByDate, onTimeDates, habitColo
                       key={di}
                       ref={isToday ? todayCellRef : undefined}
                       onClick={isYesterdayClickable ? onYesterdayClick : undefined}
+                      data-no-flip={isYesterdayClickable || undefined}
                       onMouseEnter={!isOutsideYear ? (e) => {
                         const rect = e.currentTarget.getBoundingClientRect();
                         const parentRect = e.currentTarget.closest('[data-grid-container]')?.getBoundingClientRect();

@@ -8,6 +8,7 @@ import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import type { Habit, HabitCompletion } from './supabase';
+import { computeHabitBadges } from './habitStats';
 
 interface BadgesProps {
   habits: Habit[];
@@ -16,111 +17,6 @@ interface BadgesProps {
 
 const TOTAL_MILESTONES = [50, 100, 250, 500, 1000, 2000, 5000];
 
-
-function toLocalDateString(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-interface MonthBadge {
-  year: number;
-  month: number; // 1-12
-}
-
-interface HabitBadges {
-  habit: Habit;
-  perfectMonths: MonthBadge[];
-  /** Current month is still unbroken — days left until the badge */
-  ongoingDaysLeft: number | null;
-  currentStreak: number;
-  bestStreak: number;
-}
-
-function computeHabitBadges(habit: Habit, dates: Set<string>, today: Date): HabitBadges {
-  const todayStr = toLocalDateString(today);
-
-  const created = new Date(habit.created_at);
-  created.setHours(0, 0, 0, 0);
-
-  const perfectMonths: MonthBadge[] = [];
-  let ongoingDaysLeft: number | null = null;
-
-  const cursor = new Date(created.getFullYear(), created.getMonth(), 1);
-  while (cursor.getFullYear() < today.getFullYear()
-    || (cursor.getFullYear() === today.getFullYear() && cursor.getMonth() <= today.getMonth())) {
-    const y = cursor.getFullYear();
-    const m = cursor.getMonth();
-    const monthEnd = new Date(y, m + 1, 0); // last day of month
-    const isCurrentMonth = y === today.getFullYear() && m === today.getMonth();
-
-    // Strict rule: every single day of the calendar month must be done.
-    // A month the habit was created mid-way can never earn the medal.
-    if (created > cursor) {
-      cursor.setMonth(cursor.getMonth() + 1);
-      continue;
-    }
-
-    const judgeStart = cursor;
-    const judgeEnd = isCurrentMonth ? today : monthEnd;
-
-    let perfect = judgeStart <= judgeEnd;
-    for (const d = new Date(judgeStart); d <= judgeEnd; d.setDate(d.getDate() + 1)) {
-      if (!dates.has(toLocalDateString(d))) { perfect = false; break; }
-    }
-    // Today itself may simply not be done yet — don't break the run for that
-    if (isCurrentMonth && !perfect) {
-      let perfectUntilYesterday = judgeStart < judgeEnd;
-      for (const d = new Date(judgeStart); d < judgeEnd; d.setDate(d.getDate() + 1)) {
-        if (!dates.has(toLocalDateString(d))) { perfectUntilYesterday = false; break; }
-      }
-      perfect = perfectUntilYesterday;
-    }
-
-    if (perfect) {
-      if (isCurrentMonth) {
-        if (judgeEnd < monthEnd || !dates.has(todayStr)) {
-          ongoingDaysLeft = Math.max(
-            Math.round((monthEnd.getTime() - today.getTime()) / 86400000)
-              + (dates.has(todayStr) ? 0 : 1),
-            1,
-          );
-        } else {
-          perfectMonths.push({ year: y, month: m + 1 }); // last day done — badge earned
-        }
-      } else {
-        perfectMonths.push({ year: y, month: m + 1 });
-      }
-    }
-
-    cursor.setMonth(cursor.getMonth() + 1);
-  }
-
-  // Streaks: current (ending today or yesterday) and all-time best
-  const sortedDates = [...dates].sort();
-  let bestStreak = 0;
-  let run = 0;
-  let prev: string | null = null;
-  for (const ds of sortedDates) {
-    if (prev !== null) {
-      const p = new Date(prev + 'T00:00:00');
-      p.setDate(p.getDate() + 1);
-      run = toLocalDateString(p) === ds ? run + 1 : 1;
-    } else {
-      run = 1;
-    }
-    if (run > bestStreak) bestStreak = run;
-    prev = ds;
-  }
-
-  let currentStreak = 0;
-  const cur = new Date(today);
-  if (!dates.has(toLocalDateString(cur))) cur.setDate(cur.getDate() - 1); // today not done yet is OK
-  while (dates.has(toLocalDateString(cur))) {
-    currentStreak++;
-    cur.setDate(cur.getDate() - 1);
-  }
-
-  return { habit, perfectMonths, ongoingDaysLeft, currentStreak, bestStreak };
-}
 
 // --- Medal (SVG) -----------------------------------------------------------
 // A ribbon-and-disc medal. `value`+`unit` engraved in the center, `year`
@@ -135,7 +31,7 @@ interface MedalProps {
   ongoing?: boolean;
 }
 
-function Medal({ color, value, unit, year, ribbonColor, ongoing }: MedalProps) {
+export function Medal({ color, value, unit, year, ribbonColor, ongoing }: MedalProps) {
   const gid = useId();
   const rim = darken(color, 0.35);
   const ribbon = ribbonColor ?? darken(color, 0.18);
@@ -200,7 +96,7 @@ function Medal({ color, value, unit, year, ribbonColor, ongoing }: MedalProps) {
 // plaque, a breathing golden halo behind it, and a specular sweep across
 // the bowl. All animation is SMIL (works on iOS).
 
-function Trophy({ value, unit }: { value: string; unit: string }) {
+export function Trophy({ value, unit }: { value: string; unit: string }) {
   const gid = useId();
   const valueSize = value.length >= 4 ? 9.5 : value.length === 3 ? 11 : 13;
   const BOWL = 'M14 18 H42 V27 C42 39 35.5 45 28 45 C20.5 45 14 39 14 27 Z';
