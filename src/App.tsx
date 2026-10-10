@@ -920,16 +920,17 @@ function AppContent() {
   };
 
   /** カード右上のボタン(裏返す ↻ と ︙ メニュー)。表と裏で共通 */
-  const cardButtons = (habitId: string, isShared: boolean) => (
+  // 表面(草グラフ)は ︙ だけ。裏面には表に戻す ↻ も置く
+  const cardButtons = (habitId: string, isShared: boolean, showFlip = false) => (
     <>
-      <IconButton
+      {showFlip && <IconButton
         size="small"
         aria-label="カードを裏返す"
         onClick={() => toggleFlip(habitId)}
         sx={{ color: 'text.disabled', '&:hover': { color: 'text.primary' }, ml: 0.25, p: 0.5 }}
       >
         <ThreeSixtyIcon sx={{ fontSize: '1.05rem' }} />
-      </IconButton>
+      </IconButton>}
       <IconButton
         size="small"
         onClick={e => {
@@ -1224,7 +1225,7 @@ function AppContent() {
                             completions={completionsOf(habit.id)}
                             note={notes.get(habit.id)}
                             onSaveNote={patch => handleSaveNote(habit.id, patch)}
-                            actions={cardButtons(habit.id, isShared)}
+                            actions={cardButtons(habit.id, isShared, true)}
                           />
                         </Suspense>
                       }
@@ -1455,24 +1456,6 @@ function AppContent() {
           onClick={() => {
             const target = habits.find(h => h.id === habitMenuTarget);
             setHabitMenuAnchor(null);
-            if (target) setShareModalHabit(target);
-          }}
-          sx={{ gap: 1.5, py: 1.25 }}
-        >
-          <ShareIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-          <Box>
-            <Typography variant="body2">Share Habits</Typography>
-            {habitMenuTarget && myShares.has(habitMenuTarget) && (
-              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: -0.25 }}>
-                共有中 — タップでQRを表示
-              </Typography>
-            )}
-          </Box>
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            const target = habits.find(h => h.id === habitMenuTarget);
-            setHabitMenuAnchor(null);
             setHabitMenuTarget(null);
             if (target) setTimeDialogHabit(target);
           }}
@@ -1489,6 +1472,41 @@ function AppContent() {
                 </Typography>
               ) : null;
             })()}
+          </Box>
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            const target = habits.find(h => h.id === habitMenuTarget);
+            setHabitMenuAnchor(null);
+            if (target) setShareModalHabit(target);
+          }}
+          sx={{ gap: 1.5, py: 1.25 }}
+        >
+          <ShareIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+          <Box>
+            <Typography variant="body2">Share Habits</Typography>
+            {habitMenuTarget && myShares.has(habitMenuTarget) && (
+              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: -0.25 }}>
+                共有中 — タップでQRを表示
+              </Typography>
+            )}
+          </Box>
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            const id = habitMenuTarget;
+            setHabitMenuAnchor(null);
+            setHabitMenuTarget(null);
+            if (id) toggleFlip(id);
+          }}
+          sx={{ gap: 1.5, py: 1.25 }}
+        >
+          <ThreeSixtyIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+          <Box>
+            <Typography variant="body2">カードを裏返す</Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: -0.25 }}>
+              ダブルタップ
+            </Typography>
           </Box>
         </MenuItem>
         <Divider />
