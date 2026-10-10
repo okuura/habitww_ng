@@ -78,6 +78,7 @@ import {
 } from './supabase';
 import ActivityGrid from './ActivityGrid';
 import HabitCardShell from './HabitCardShell';
+import AddHabitDialog from './AddHabitDialog';
 import { rarityOf } from './habitStats';
 import LoginPage from './LoginPage';
 
@@ -423,6 +424,7 @@ function SortableHabit({ id, children }: { id: string; children: ReactNode }) {
   return (
     <Box
       ref={setNodeRef}
+      id={`habit-${id}`}
       {...attributes}
       {...listeners}
       sx={{
@@ -505,6 +507,7 @@ function AppContent() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newHabitName, setNewHabitName] = useState('');
   const [newHabitColor, setNewHabitColor] = useState(HABIT_COLORS[0]);
+  const [newHabitIdeal, setNewHabitIdeal] = useState('');
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState<string | null>(null);
   const [celebrating, setCelebrating] = useState<{ id: string; level: 1 | 2 } | null>(null);
@@ -800,18 +803,42 @@ function AppContent() {
   const handleAddHabit = async () => {
     if (!newHabitName.trim() || !user) return;
     setSaving(true);
-    await supabase.from('habits').insert({
+    const ideal = newHabitIdeal.trim();
+    const { data: created, error } = await supabase.from('habits').insert({
       name: newHabitName.trim(),
       color: newHabitColor,
       user_id: user.id,
       // 新しい習慣は末尾に
       sort_order: Math.max(-1, ...habits.map(h => h.sort_order ?? 0)) + 1,
-    });
+    }).select().single();
+    if (error || !created) {
+      setSaving(false);
+      setSnackbarMsg('習慣を追加できませんでした');
+      return;
+    }
+    if (ideal) {
+      await supabase.from('habit_notes').upsert({ habit_id: created.id, why: '', ideal, updated_at: new Date().toISOString() });
+    }
     setNewHabitName('');
     setNewHabitColor(HABIT_COLORS[0]);
+    setNewHabitIdeal('');
     setDialogOpen(false);
     setSaving(false);
+    // 入力したカード(裏面)の姿で一覧に現れ、くるっと表(草グラフ)に返る
+    setMountedBackIds(prev => new Set(prev).add(created.id));
+    setFlippedIds(prev => new Set(prev).add(created.id));
     await fetchData();
+    setTimeout(() => {
+      document.getElementById(`habit-${created.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 50);
+    setTimeout(() => {
+      vibrate(12);
+      setFlippedIds(prev => {
+        const next = new Set(prev);
+        next.delete(created.id);
+        return next;
+      });
+    }, 900);
   };
 
   // 習慣カードの長押し → ドラッグで並べ替え
@@ -1464,53 +1491,21 @@ function AppContent() {
 
       {/* ===== Dialogs ===== */}
 
-      {/* Add Habit */}
-      <Dialog
+      {/* Add Habit: 習慣カードの形のカードに書き込む */}
+      <AddHabitDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
-        fullWidth maxWidth="xs"
-        PaperProps={{ sx: { borderRadius: 3 } }}
-      >
-        <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>新しい習慣を追加</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus fullWidth label="習慣の名前" placeholder="例: 毎日30分読書"
-            value={newHabitName}
-            onChange={e => setNewHabitName(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleAddHabit(); }}
-            sx={{ mt: 1, mb: 2 }}
-          />
-          <Typography variant="body2" sx={{ mb: 1.5, color: 'text.secondary', fontWeight: 500 }}>
-            カラーを選択
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-            {HABIT_COLORS.map(color => (
-              <Box
-                key={color}
-                onClick={() => setNewHabitColor(color)}
-                sx={{
-                  width: 36, height: 36, borderRadius: '50%', bgcolor: color, cursor: 'pointer',
-                  border: '3px solid',
-                  borderColor: newHabitColor === color ? 'text.primary' : 'transparent',
-                  transition: theme.transitions.create('transform', { duration: theme.transitions.duration.shorter }),
-                  '&:hover': { transform: 'scale(1.15)' },
-                }}
-              />
-            ))}
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
-          <Button onClick={() => setDialogOpen(false)} sx={{ borderRadius: 2 }}>キャンセル</Button>
-          <Button
-            variant="contained"
-            onClick={handleAddHabit}
-            disabled={!newHabitName.trim() || saving}
-            sx={{ borderRadius: 2, fontWeight: 700, flex: 1 }}
-          >
-            追加する
-          </Button>
-        </DialogActions>
-      </Dialog>
+        paperBg={paperColorFor(mode === 'dark' ? 'dark' : 'light')}
+        colors={HABIT_COLORS}
+        name={newHabitName}
+        onNameChange={setNewHabitName}
+        ideal={newHabitIdeal}
+        onIdealChange={setNewHabitIdeal}
+        color={newHabitColor}
+        onColorChange={setNewHabitColor}
+        saving={saving}
+        onSubmit={handleAddHabit}
+      />
 
       {/* Delete Habit */}
       <Dialog
