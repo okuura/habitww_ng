@@ -22,7 +22,7 @@ interface HabitCardBackProps {
   actions: ReactNode;
 }
 
-const RARITY_NAME: Record<Rarity, string> = { normal: 'NORMAL', silver: 'SILVER', gold: 'GOLD', holo: 'HOLO' };
+const RARITY_NAME: Record<Rarity, string> = { normal: 'NORMAL', bronze: 'BRONZE', silver: 'SILVER', gold: 'GOLD', holo: 'HOLO' };
 
 /** 裏面の文字・区切り線の色。ノーマルは紙のまま(テーマの色) */
 function inkOf(finish: CardFinish | null) {

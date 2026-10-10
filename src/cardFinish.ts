@@ -33,6 +33,17 @@ const metal = (base: string, extra: string[] = []) =>
 
 export const FINISH: Record<Rarity, CardFinish | null> = {
   normal: null,
+  bronze: {
+    metal: true,
+    background: metal('linear-gradient(172deg, #7a4a22 0%, #b07440 14%, #dca06a 32%, #b5773f 50%, #d39560 68%, #a0652f 84%, #6f421d 100%)'),
+    ink: '#3f230b',
+    inkSub: 'rgba(63,35,11,0.75)',
+    engrave: '0 1px 0 rgba(255,222,190,0.6), 0 -1px 0 rgba(50,25,5,0.3)',
+    panelBg: 'rgba(80,40,10,0.08)',
+    panelShadow: 'inset 1px 1px 1px rgba(60,30,5,0.4), inset -1px -1px 0 rgba(255,220,185,0.55)',
+    line: 'rgba(70,38,10,0.5)',
+    sheen: 'linear-gradient(115deg, transparent 36%, rgba(255,228,200,0.45) 47%, rgba(255,255,255,0.12) 53%, transparent 64%)',
+  },
   silver: {
     metal: true,
     background: metal('linear-gradient(172deg, #9aa3ae 0%, #d9dde3 16%, #f4f6f8 34%, #c3c9d1 52%, #e9ecf0 70%, #a4adb8 100%)'),

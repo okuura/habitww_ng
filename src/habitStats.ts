@@ -110,10 +110,11 @@ export function computeHabitBadges(habit: Habit, dates: Set<string>, today: Date
 
 // --- レアリティ(累計日数でカードの格が上がる) ----------------------------------
 
-export type Rarity = 'normal' | 'silver' | 'gold' | 'holo';
+export type Rarity = 'normal' | 'bronze' | 'silver' | 'gold' | 'holo';
 
 export const RARITY_TIERS: { rarity: Rarity; min: number; label: string }[] = [
   { rarity: 'normal', min: 0, label: 'ノーマル' },
+  { rarity: 'bronze', min: 8, label: 'ブロンズ' },
   { rarity: 'silver', min: 30, label: 'シルバー' },
   { rarity: 'gold', min: 100, label: 'ゴールド' },
   { rarity: 'holo', min: 365, label: 'ホロ' },

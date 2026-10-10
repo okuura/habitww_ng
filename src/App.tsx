@@ -79,6 +79,7 @@ import {
 import ActivityGrid from './ActivityGrid';
 import HabitCardShell from './HabitCardShell';
 import AddHabitDialog from './AddHabitDialog';
+import RankUpEffect, { type RankUp } from './RankUpEffect';
 import { rarityOf } from './habitStats';
 import LoginPage from './LoginPage';
 
@@ -508,6 +509,7 @@ function AppContent() {
   const [newHabitName, setNewHabitName] = useState('');
   const [newHabitColor, setNewHabitColor] = useState(HABIT_COLORS[0]);
   const [newHabitIdeal, setNewHabitIdeal] = useState('');
+  const [rankUp, setRankUp] = useState<RankUp | null>(null);
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState<string | null>(null);
   const [celebrating, setCelebrating] = useState<{ id: string; level: 1 | 2 } | null>(null);
@@ -695,6 +697,17 @@ function AppContent() {
     }
   }
 
+  /** 記録を 1 日足したことでカードのランクが上がったら、少し待ってから昇格の演出を出す */
+  const celebrateRankUp = (habit: Habit, before: number, delay: number) => {
+    const from = rarityOf(before);
+    const to = rarityOf(before + 1);
+    const rarity = to.rarity;
+    if (rarity === from.rarity || rarity === 'normal') return;
+    setTimeout(() => setRankUp({ habitName: habit.name, rarity, label: to.label, days: before + 1 }), delay);
+  };
+
+  const closeRankUp = useCallback(() => setRankUp(null), []);
+
   const handleToggle = async (habit: Habit) => {
     setToggling(habit.id);
     const current = todayIntensity.get(habit.id) ?? 0;
@@ -740,6 +753,8 @@ function AppContent() {
     // First completion of the day: shout out the streak it extends
     if (current === 0 && nextIntensity === 1) {
       const before = new Set((completionsByHabit.get(habit.id) ?? new Map<string, number>()).keys());
+      // カード上のポップ(疾風迅雷・連続記録)を見せてから
+      celebrateRankUp(habit, before.size, onTime ? 3300 : 1500);
       const after = new Set(before);
       after.add(todayStr);
       const newStreak = calculateStreak(after);
@@ -980,6 +995,8 @@ function AppContent() {
 
   const handleYesterdayComplete = async () => {
     if (!yesterdayHabitTarget) return;
+    const target = habits.find(h => h.id === yesterdayHabitTarget);
+    if (target) celebrateRankUp(target, completionsByHabit.get(target.id)?.size ?? 0, 400);
     setCompletions(prev => [...prev, {
       id: 'optimistic-y',
       habit_id: yesterdayHabitTarget,
@@ -1012,6 +1029,7 @@ function AppContent() {
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       {fever && <FeverOverlay colors={habits.map(h => h.color)} />}
+      {rankUp && <RankUpEffect rankUp={rankUp} onClose={closeRankUp} />}
       {/* Shared gradient for flame icons (referenced via fill: url(#fire-grad)) */}
       <svg width={0} height={0} style={{ position: 'absolute' }} aria-hidden focusable="false">
         <defs>

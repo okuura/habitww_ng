@@ -65,9 +65,6 @@ export default function AddHabitDialog({
             // 16px 以上(iOS がフォーカス時に拡大しないように)
             sx={{ fontWeight: 800, fontSize: '1.1rem', '& input::placeholder': { fontWeight: 600, fontSize: '1rem' } }}
           />
-          <Typography sx={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.3em', color: 'text.secondary', flexShrink: 0 }}>
-            NEW
-          </Typography>
         </Box>
 
         <Typography sx={{ mt: 1.5, fontSize: '0.62rem', fontWeight: 700, color: 'text.secondary' }}>目標(任意)</Typography>
