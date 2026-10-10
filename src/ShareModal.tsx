@@ -17,7 +17,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import IconButton from '@mui/material/IconButton';
 import { QRCodeSVG } from 'qrcode.react';
 import type { User } from '@supabase/supabase-js';
-import { supabase, type Habit, type HabitShare } from './supabase';
+import { supabase, userDisplayName, type Habit, type HabitShare } from './supabase';
 
 interface ShareModalProps {
   open: boolean;
@@ -59,7 +59,7 @@ export default function ShareModal({
     const create = async () => {
       setCreating(true);
       const sharerName =
-        (user.user_metadata?.name as string | undefined) ||
+        userDisplayName(user) ||
         user.email?.split('@')[0] ||
         'ユーザー';
       const { data, error } = await supabase

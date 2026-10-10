@@ -1,9 +1,16 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type User } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+/** 表示名。設定で決めた名前(display_name)を優先し、無ければログイン元(Google など)の名前。
+ *  name はログインのたびにログイン元の値で上書きされるので、自分で決めた名前は別のキーに持つ */
+export function userDisplayName(user: User | null | undefined): string | undefined {
+  const meta = user?.user_metadata;
+  return (meta?.display_name as string | undefined)?.trim() || (meta?.name as string | undefined) || undefined;
+}
 
 // ---------------------------------------------------------------------------
 // Startup fast path

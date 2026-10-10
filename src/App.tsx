@@ -24,6 +24,8 @@ import Avatar from '@mui/material/Avatar';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Divider from '@mui/material/Divider';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import CircularProgress from '@mui/material/CircularProgress';
 import { AppShellSkeleton, StatsPageSkeleton, SharePageSkeleton } from './SkeletonFallbacks';
 import Paper from '@mui/material/Paper';
@@ -36,11 +38,12 @@ import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
-import LogoutIcon from '@mui/icons-material/Logout';
 import PersonOffIcon from '@mui/icons-material/PersonOff';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import LightModeIcon from '@mui/icons-material/LightMode';
+import SettingsBrightnessIcon from '@mui/icons-material/SettingsBrightness';
+import SettingsIcon from '@mui/icons-material/Settings';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ThreeSixtyIcon from '@mui/icons-material/ThreeSixty';
 import ShareIcon from '@mui/icons-material/Share';
@@ -61,6 +64,7 @@ import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { CSS } from '@dnd-kit/utilities';
 import type { ReactNode } from 'react';
 import theme from './theme';
+import SettingsDialog from './SettingsDialog';
 // Heavy display face for the streak pop (unicode-range subsets: only used glyphs load)
 import '@fontsource/dela-gothic-one';
 import {
@@ -68,6 +72,7 @@ import {
   initialSession,
   takePreloadedData,
   fetchAppData,
+  userDisplayName,
   readCachedData,
   writeCachedData,
   clearCachedData,
@@ -494,7 +499,9 @@ export default function App() {
 }
 
 function AppContent() {
-  const { mode, setMode } = useColorScheme();
+  const { mode, systemMode, setMode } = useColorScheme();
+  // 「システム設定」のときは端末の設定に従う
+  const darkMode = (mode === 'system' ? systemMode : mode) === 'dark';
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [habits, setHabits] = useState<Habit[]>(initialCache?.habits ?? []);
@@ -523,6 +530,7 @@ function AppContent() {
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deleteHabitTarget, setDeleteHabitTarget] = useState<string | null>(null);
   const [page, setPage] = useState<'habits' | 'stats' | 'share'>('habits');
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [editingHabitId, setEditingHabitId] = useState<string | null>(null);
   const [editingHabitName, setEditingHabitName] = useState('');
   const [yesterdayHabitTarget, setYesterdayHabitTarget] = useState<string | null>(null);
@@ -587,7 +595,7 @@ function AppContent() {
       habits,
       completions,
       notes: [...notes.values()],
-      userName: user.user_metadata?.name as string | undefined,
+      userName: userDisplayName(user),
       userAvatar: user.user_metadata?.avatar_url as string | undefined,
     });
   }, [habits, completions, notes, loading, user]);
@@ -961,6 +969,7 @@ function AppContent() {
     await supabase.auth.signOut();
     setDeletingAccount(false);
     setDeleteAccountDialogOpen(false);
+    setSettingsOpen(false);
     setHabits([]);
     setCompletions([]);
   };
@@ -1011,7 +1020,7 @@ function AppContent() {
   };
 
   const completedCount = habits.filter(h => completedToday.has(h.id)).length;
-  const displayName = (user?.user_metadata?.name as string | undefined) ?? initialCache?.userName;
+  const displayName = userDisplayName(user) ?? initialCache?.userName;
   const avatarLetter = displayName?.[0]?.toUpperCase()
     ?? user?.email?.[0].toUpperCase() ?? '?';
   const avatarSrc = (user?.user_metadata?.avatar_url as string | undefined)
@@ -1051,7 +1060,7 @@ function AppContent() {
                 letterSpacing: 0.4,
                 fontSize: { xs: '1.3rem', sm: '1.55rem' },
                 lineHeight: 1,
-                color: mode === 'dark' ? '#fff' : 'primary.main',
+                color: darkMode ? '#fff' : 'primary.main',
               }}
             >
               {page === 'habits' ? 'Habitww' : page === 'stats' ? 'Habits Insight' : 'Share Habits'}
@@ -1096,20 +1105,34 @@ function AppContent() {
           <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
             {displayName || 'ユーザー'}
           </Typography>
-          <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.6rem' }}>
-            build {__BUILD_TIME__}
-          </Typography>
         </Box>
         <Divider />
-        <MenuItem
-          onClick={() => { setAccountMenuAnchor(null); setMode(mode === 'dark' ? 'light' : 'dark'); }}
-          sx={{ gap: 1.5, py: 1.5 }}
-        >
-          {mode === 'dark'
-            ? <LightModeIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-            : <DarkModeIcon fontSize="small" sx={{ color: 'text.secondary' }} />}
-          <Typography variant="body2">{mode === 'dark' ? 'ライトモード' : 'ダークモード'}</Typography>
-        </MenuItem>
+        {/* テーマ: システム設定 / ライト / ダーク(押してもメニューは閉じず、その場で切り替わる) */}
+        <Box sx={{ px: 1.5, pt: 1.25, pb: 1 }}>
+          <Typography sx={{ px: 0.5, mb: 0.75, fontSize: '0.7rem', fontWeight: 700, color: 'text.secondary' }}>テーマ</Typography>
+          <ToggleButtonGroup
+            exclusive fullWidth size="small"
+            value={mode ?? 'system'}
+            onChange={(_, v) => { if (v) setMode(v); }}
+            aria-label="テーマ"
+            // iOS のセグメントのように、溝の中で選んだものだけが浮き上がる
+            sx={{
+              p: '3px', gap: '3px', borderRadius: '10px', bgcolor: 'action.hover',
+              '& .MuiToggleButton-root': {
+                flexDirection: 'column', gap: 0.25, py: 0.6, border: 0, borderRadius: '8px !important',
+                textTransform: 'none', fontSize: '0.68rem', fontWeight: 700, lineHeight: 1.2, color: 'text.secondary',
+                '&.Mui-selected, &.Mui-selected:hover': {
+                  bgcolor: 'background.paper', color: 'text.primary', boxShadow: '0 1px 3px rgba(0,0,0,0.18)',
+                },
+              },
+            }}
+          >
+            <ToggleButton value="system"><SettingsBrightnessIcon fontSize="small" />システム</ToggleButton>
+            <ToggleButton value="light"><LightModeIcon fontSize="small" />ライト</ToggleButton>
+            <ToggleButton value="dark"><DarkModeIcon fontSize="small" />ダーク</ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
+        <Divider />
         {window.HabitwwNative && (
           <MenuItem
             onClick={() => { setAccountMenuAnchor(null); window.HabitwwNative?.openSettings(); }}
@@ -1119,16 +1142,12 @@ function AppContent() {
             <Typography variant="body2">通知・ウィジェット設定</Typography>
           </MenuItem>
         )}
-        <MenuItem onClick={handleSignOut} sx={{ gap: 1.5, py: 1.5 }}>
-          <LogoutIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-          <Typography variant="body2">ログアウト</Typography>
-        </MenuItem>
         <MenuItem
-          onClick={() => { setAccountMenuAnchor(null); setDeleteAccountDialogOpen(true); }}
-          sx={{ gap: 1.5, py: 1.5, color: 'error.main' }}
+          onClick={() => { setAccountMenuAnchor(null); setSettingsOpen(true); }}
+          sx={{ gap: 1.5, py: 1.5 }}
         >
-          <PersonOffIcon fontSize="small" />
-          <Typography variant="body2" color="error">退会する</Typography>
+          <SettingsIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+          <Typography variant="body2">設定</Typography>
         </MenuItem>
       </Menu>
 
@@ -1185,7 +1204,7 @@ function AppContent() {
                   const totalCount = datesSet.size;
                   const isShared = myShares.has(habit.id);
 
-                  const paperBg = paperColorFor(mode === 'dark' ? 'dark' : 'light');
+                  const paperBg = paperColorFor(darkMode ? 'dark' : 'light');
 
                   return (
                     <SortableHabit key={habit.id} id={habit.id}>
@@ -1194,7 +1213,7 @@ function AppContent() {
                       color={habit.color}
                       intensity={currentIntensity}
                       paperBg={paperBg}
-                      dark={mode === 'dark'}
+                      dark={darkMode}
                       flipped={flippedIds.has(habit.id)}
                       backMounted={mountedBackIds.has(habit.id)}
                       onFlip={() => toggleFlip(habit.id)}
@@ -1321,7 +1340,7 @@ function AppContent() {
                         )}
                         {(() => {
                           const isCelebrating = celebrating?.id === habit.id;
-                          const isDark = mode === 'dark';
+                          const isDark = darkMode;
 
                           // Same color logic as ActivityGrid getCellBg
                           const stdBg = isDark ? getStdColorDark(habit.color) : habit.color;
@@ -1513,7 +1532,7 @@ function AppContent() {
       <AddHabitDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
-        paperBg={paperColorFor(mode === 'dark' ? 'dark' : 'light')}
+        paperBg={paperColorFor(darkMode ? 'dark' : 'light')}
         colors={HABIT_COLORS}
         name={newHabitName}
         onNameChange={setNewHabitName}
@@ -1576,16 +1595,28 @@ function AppContent() {
       </Dialog>
 
       {/* Delete Account */}
+      {user && (
+        <SettingsDialog
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          user={user}
+          dark={darkMode}
+          onUserUpdated={setUser}
+          onSignOut={() => { setSettingsOpen(false); handleSignOut(); }}
+          onDeleteAccount={() => setDeleteAccountDialogOpen(true)}
+        />
+      )}
+
       <Dialog
         open={deleteAccountDialogOpen}
         onClose={() => !deletingAccount && setDeleteAccountDialogOpen(false)}
         maxWidth="xs" fullWidth
         PaperProps={{ sx: { borderRadius: 3 } }}
       >
-        <DialogTitle sx={{ fontWeight: 700, color: 'error.main', pb: 1 }}>退会する</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700, color: 'error.main', pb: 1 }}>アカウントを削除</DialogTitle>
         <DialogContent>
           <DialogContentText sx={{ color: 'text.secondary' }}>
-            退会すると、登録したすべての習慣と記録データが完全に削除されます。この操作は取り消せません。
+            アカウントを削除すると、登録したすべての習慣と記録データが完全に削除されます。この操作は取り消せません。
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
@@ -1604,7 +1635,7 @@ function AppContent() {
             startIcon={deletingAccount ? <CircularProgress size={16} color="inherit" /> : <PersonOffIcon />}
             sx={{ borderRadius: 2, fontWeight: 700 }}
           >
-            退会する
+            削除する
           </Button>
         </DialogActions>
       </Dialog>
