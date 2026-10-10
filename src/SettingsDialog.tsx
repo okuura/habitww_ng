@@ -94,9 +94,10 @@ export default function SettingsDialog({ open, onClose, user, dark, onUserUpdate
   };
 
   // iOS のグループ一覧の配色
+  // (シートの中なので、ダークは一段明るいグレーの地に、さらに明るいセル)
   const c = dark
-    ? { bg: '#000', cell: '#1c1c1e', sep: 'rgba(84,84,88,0.6)', sub: 'rgba(235,235,245,0.6)', bar: 'rgba(28,28,30,0.94)' }
-    : { bg: '#f2f2f7', cell: '#fff', sep: 'rgba(60,60,67,0.18)', sub: 'rgba(60,60,67,0.6)', bar: 'rgba(249,249,249,0.94)' };
+    ? { bg: '#1c1c1e', cell: '#2c2c2e', sep: 'rgba(84,84,88,0.6)', sub: 'rgba(235,235,245,0.6)', glass: 'rgba(255,255,255,0.1)', glassEdge: 'rgba(255,255,255,0.14)' }
+    : { bg: '#f2f2f7', cell: '#fff', sep: 'rgba(60,60,67,0.18)', sub: 'rgba(60,60,67,0.6)', glass: 'rgba(255,255,255,0.75)', glassEdge: 'rgba(0,0,0,0.06)' };
   const accent = theme.palette.primary.main;
 
   return (
@@ -111,9 +112,11 @@ export default function SettingsDialog({ open, onClose, user, dark, onUserUpdate
       PaperProps={{
         ref: paperRef,
         sx: {
-          m: 0, width: '100%', maxWidth: 600,
+          // iOS のシートと同じく左右を少し浮かせ、角を大きく丸める
+          m: 0, mx: '6px', width: 'calc(100% - 12px)', maxWidth: 600,
           height: 'calc(100% - env(safe-area-inset-top, 0px) - 10px)', maxHeight: 'none',
-          borderRadius: '20px 20px 0 0',
+          borderRadius: '34px 34px 0 0',
+          boxShadow: '0 -4px 30px rgba(0,0,0,0.25)',
           bgcolor: c.bg, backgroundImage: 'none', overflow: 'hidden',
           display: 'flex', flexDirection: 'column',
         },
@@ -127,20 +130,27 @@ export default function SettingsDialog({ open, onClose, user, dark, onUserUpdate
         onPointerCancel={onDragEnd}
         sx={{
           touchAction: 'none',
-          position: 'relative', flexShrink: 0, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          bgcolor: c.bar, borderBottom: `0.5px solid ${c.sep}`,
+          // 地と同じ色で、区切り線も無し(iOS のシートのナビゲーションバー)
+          position: 'relative', flexShrink: 0, height: 72, display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}
       >
-        <Typography sx={{ fontWeight: 600, fontSize: '1.0625rem' }}>設定</Typography>
+        <Typography sx={{ fontWeight: 700, fontSize: '1.125rem' }}>設定</Typography>
+        {/* ガラスのカプセルのボタン */}
         <ButtonBase
           onClick={handleClose}
-          sx={{ position: 'absolute', right: 8, px: 1, py: 0.75, borderRadius: 1, color: accent, fontWeight: 600, fontSize: '1.0625rem' }}
+          sx={{
+            position: 'absolute', right: 14, height: 44, px: 2.25, borderRadius: '22px',
+            color: accent, fontWeight: 600, fontSize: '1.0625rem',
+            bgcolor: c.glass, border: `0.5px solid ${c.glassEdge}`,
+            boxShadow: dark ? 'inset 0 1px 0 rgba(255,255,255,0.08)' : '0 1px 4px rgba(0,0,0,0.08)',
+            backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+          }}
         >
           完了
         </ButtonBase>
       </Box>
 
-      <Box sx={{ flex: 1, overflowY: 'auto', px: 2, pt: 1, pb: 'calc(24px + env(safe-area-inset-bottom, 0px))' }}>
+      <Box sx={{ flex: 1, overflowY: 'auto', px: 2, pt: 0, pb: 'calc(24px + env(safe-area-inset-bottom, 0px))' }}>
         <Section
           c={c}
           header="プロフィール"
@@ -205,11 +215,11 @@ type Palette = { cell: string; sep: string; sub: string };
 
 function Section({ c, header, footer, children }: { c: Palette; header?: string; footer?: ReactNode; children: ReactNode }) {
   return (
-    <Box sx={{ mt: header ? 2.5 : 3.5 }}>
+    <Box sx={{ mt: header ? 1 : 3.5 }}>
       {header && (
-        <Typography sx={{ px: 2, pb: 0.75, fontSize: '0.8125rem', color: c.sub }}>{header}</Typography>
+        <Typography sx={{ px: 2, pb: 1, fontSize: '0.9375rem', fontWeight: 600, color: c.sub }}>{header}</Typography>
       )}
-      <Box sx={{ bgcolor: c.cell, borderRadius: '10px', overflow: 'hidden' }}>{children}</Box>
+      <Box sx={{ bgcolor: c.cell, borderRadius: '24px', overflow: 'hidden' }}>{children}</Box>
       {footer && (
         <Typography sx={{ px: 2, pt: 0.75, fontSize: '0.8125rem', lineHeight: 1.4, color: c.sub }}>{footer}</Typography>
       )}
@@ -221,9 +231,9 @@ function Row({ c, divider, onClick, children }: { c: Palette; divider?: boolean;
   const content = (
     <Box
       sx={{
-        position: 'relative', width: '100%', minHeight: 44, px: 2, py: 1.1, display: 'flex', alignItems: 'center',
+        position: 'relative', width: '100%', minHeight: 52, px: 2.5, py: 1.25, display: 'flex', alignItems: 'center',
         // 区切り線は左に余白を空ける(iOS の一覧と同じ)
-        ...(divider ? { '&::before': { content: '""', position: 'absolute', top: 0, left: 16, right: 0, borderTop: `1px solid ${c.sep}` } } : {}),
+        ...(divider ? { '&::before': { content: '""', position: 'absolute', top: 0, left: 20, right: 0, borderTop: `1px solid ${c.sep}` } } : {}),
       }}
     >
       {children}
