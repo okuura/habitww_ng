@@ -573,7 +573,7 @@ function AppContent() {
     // content stays visible while fresh data arrives.
     const preloaded = takePreloadedData();
     let data = preloaded ? await preloaded : null;
-    if (!data) data = await fetchAppData();
+    if (!data) data = await fetchAppData(user.id);
     setHabits(data.habits);
     setCompletions(data.completions);
     setNotes(new Map(data.notes.map(n => [n.habit_id, n])));

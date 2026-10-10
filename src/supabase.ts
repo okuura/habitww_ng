@@ -61,20 +61,27 @@ export interface AppData {
   notes: HabitNote[];
 }
 
-/** 習慣・記録・メモをまとめて取得する(メモのテーブルが無い/読めない場合は空として扱う) */
-export async function fetchAppData(): Promise<AppData> {
+/** 自分の習慣・記録・メモをまとめて取得する(メモのテーブルが無い/読めない場合は空として扱う)。
+ *  RLS では他人が共有中の習慣・購読中の習慣の記録も読めてしまうので、必ず自分の分に絞る */
+export async function fetchAppData(userId: string): Promise<AppData> {
   const [{ data: habits }, { data: completions }, { data: notes }] = await Promise.all([
-    supabase.from('habits').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: true }),
+    supabase.from('habits').select('*').eq('user_id', userId)
+      .order('sort_order', { ascending: true }).order('created_at', { ascending: true }),
     supabase.from('habit_completions').select('*'),
     supabase.from('habit_notes').select('habit_id, why, ideal'),
   ]);
-  return { habits: habits ?? [], completions: completions ?? [], notes: notes ?? [] };
+  const own = new Set((habits ?? []).map(h => h.id));
+  return {
+    habits: habits ?? [],
+    completions: (completions ?? []).filter(c => own.has(c.habit_id)),
+    notes: notes ?? [],
+  };
 }
 
 let preloadedData: Promise<AppData | null> | null =
   initialSession.then(async ({ data: { session } }) => {
     if (!session?.user) return null;
-    return fetchAppData();
+    return fetchAppData(session.user.id);
   }).catch(() => null);
 
 /** One-shot: the first fetchData() consumes the eager fetch; later calls refetch. */
