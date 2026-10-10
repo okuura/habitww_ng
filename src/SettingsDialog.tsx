@@ -1,4 +1,6 @@
-import { useState, type ReactNode } from 'react';
+import { forwardRef, useRef, useState, type ReactElement, type ReactNode, type Ref } from 'react';
+import Slide from '@mui/material/Slide';
+import type { TransitionProps } from '@mui/material/transitions';
 import Dialog from '@mui/material/Dialog';
 import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
@@ -9,8 +11,12 @@ import { useTheme } from '@mui/material/styles';
 import type { User } from '@supabase/supabase-js';
 import { supabase, userDisplayName } from './supabase';
 
-// アカウントの設定。iOS アプリの「通知・ウィジェット」設定画面と同じ、
-// グループ分けされた一覧のシート(上にタイトルと「完了」)
+// アカウントの設定。iOS アプリの「通知・ウィジェット」設定画面と同じく、下からせり上がるシートに
+// グループ分けされた一覧(上にタイトルと「完了」)。上のバーを下へ引っ張っても閉じられる
+
+const SlideUp = forwardRef(function SlideUp(props: TransitionProps & { children: ReactElement }, ref: Ref<unknown>) {
+  return <Slide direction="up" ref={ref} {...props} easing={{ enter: 'cubic-bezier(0.2, 0.9, 0.25, 1)', exit: 'cubic-bezier(0.4, 0, 1, 1)' }} />;
+});
 
 interface SettingsDialogProps {
   open: boolean;
@@ -57,6 +63,36 @@ export default function SettingsDialog({ open, onClose, user, dark, onUserUpdate
     onClose();
   };
 
+  // 上のバーを下へ引っ張って閉じる(iOS のシートと同じ)
+  const paperRef = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ y: number; t: number; dy: number } | null>(null);
+  const onDragStart = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest('button')) return;
+    drag.current = { y: e.clientY, t: performance.now(), dy: 0 };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    if (paperRef.current) paperRef.current.style.transition = 'none';
+  };
+  const onDragMove = (e: React.PointerEvent) => {
+    if (!drag.current || !paperRef.current) return;
+    const dy = Math.max(0, e.clientY - drag.current.y);
+    drag.current.dy = dy;
+    paperRef.current.style.transform = `translateY(${dy}px)`;
+  };
+  const onDragEnd = () => {
+    const d = drag.current;
+    drag.current = null;
+    const el = paperRef.current;
+    if (!d || !el) return;
+    const velocity = d.dy / Math.max(1, performance.now() - d.t);
+    el.style.transition = 'transform 250ms cubic-bezier(0.2, 0.9, 0.25, 1)';
+    if (d.dy > 120 || (d.dy > 30 && velocity > 0.6)) {
+      el.style.transform = `translateY(${el.offsetHeight}px)`;
+      setTimeout(() => { handleClose(); }, 200);
+    } else {
+      el.style.transform = '';
+    }
+  };
+
   // iOS のグループ一覧の配色
   const c = dark
     ? { bg: '#000', cell: '#1c1c1e', sep: 'rgba(84,84,88,0.6)', sub: 'rgba(235,235,245,0.6)', bar: 'rgba(28,28,30,0.94)' }
@@ -67,15 +103,17 @@ export default function SettingsDialog({ open, onClose, user, dark, onUserUpdate
     <Dialog
       open={open}
       onClose={handleClose}
+      TransitionComponent={SlideUp}
+      // 位置(transform)は Slide が開くたびに設定し直すので、ここでは名前だけ戻す
       TransitionProps={{ onEnter: reset }}
-      fullWidth maxWidth="xs"
-      sx={{ '& .MuiDialog-container': { alignItems: { xs: 'flex-end', sm: 'center' } } }}
+      fullWidth maxWidth={false}
+      sx={{ '& .MuiDialog-container': { alignItems: 'flex-end' } }}
       PaperProps={{
+        ref: paperRef,
         sx: {
-          m: 0, width: '100%', maxWidth: { xs: '100%', sm: 440 },
-          height: { xs: 'calc(100% - env(safe-area-inset-top, 0px) - 12px)', sm: 'auto' },
-          maxHeight: { sm: 'calc(100% - 64px)' },
-          borderRadius: { xs: '12px 12px 0 0', sm: '12px' },
+          m: 0, width: '100%', maxWidth: 600,
+          height: 'calc(100% - env(safe-area-inset-top, 0px) - 10px)', maxHeight: 'none',
+          borderRadius: '20px 20px 0 0',
           bgcolor: c.bg, backgroundImage: 'none', overflow: 'hidden',
           display: 'flex', flexDirection: 'column',
         },
@@ -83,8 +121,13 @@ export default function SettingsDialog({ open, onClose, user, dark, onUserUpdate
     >
       {/* ナビゲーションバー */}
       <Box
+        onPointerDown={onDragStart}
+        onPointerMove={onDragMove}
+        onPointerUp={onDragEnd}
+        onPointerCancel={onDragEnd}
         sx={{
-          position: 'relative', flexShrink: 0, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          touchAction: 'none',
+          position: 'relative', flexShrink: 0, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center',
           bgcolor: c.bar, borderBottom: `0.5px solid ${c.sep}`,
         }}
       >
@@ -137,18 +180,22 @@ export default function SettingsDialog({ open, onClose, user, dark, onUserUpdate
           </Row>
         </Section>
 
-        <Section c={c} footer="登録したすべての習慣と記録が削除されます。この操作は取り消せません">
-          <Row c={c} onClick={onDeleteAccount}>
-            <Typography sx={{ fontSize: '1.0625rem', color: 'error.main' }}>アカウントを削除</Typography>
-          </Row>
-        </Section>
-
         <Section c={c}>
           <Row c={c}>
             <Typography sx={{ fontSize: '1.0625rem', flexShrink: 0 }}>ビルド</Typography>
             <Typography noWrap sx={{ flex: 1, ml: 2, textAlign: 'right', fontSize: '1.0625rem', color: c.sub }}>{__BUILD_TIME__}</Typography>
           </Row>
         </Section>
+
+        {/* 誤って押さないよう、一覧の外の一番下に小さく置く(押すと確認ダイアログ) */}
+        <Box sx={{ mt: 6, display: 'flex', justifyContent: 'center' }}>
+          <ButtonBase
+            onClick={onDeleteAccount}
+            sx={{ px: 1.5, py: 1, borderRadius: 1, fontSize: '0.75rem', color: c.sub, textDecoration: 'underline', textUnderlineOffset: '3px' }}
+          >
+            アカウントを削除
+          </ButtonBase>
+        </Box>
       </Box>
     </Dialog>
   );
