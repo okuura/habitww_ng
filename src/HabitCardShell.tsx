@@ -67,10 +67,7 @@ interface HabitCardShellProps {
 
 export default function HabitCardShell({ rarity, color, intensity, paperBg, dark, flipped, onFlip, front, back, backMounted }: HabitCardShellProps) {
   const rootRef = useRef<HTMLDivElement>(null);
-  const tiltRef = useRef<HTMLDivElement>(null);
   const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
-  const press = useRef<{ id: number; x: number; y: number; tilting: boolean } | null>(null);
-  const suppressClick = useRef(false);
 
   useEffect(() => {
     const el = rootRef.current;
@@ -84,12 +81,6 @@ export default function HabitCardShell({ rarity, color, intensity, paperBg, dark
   // ダブルタップで裏返す(iOS では dblclick が当てにならないので自前で判定)。
   // ボタン・入力欄・チップ・名前など、タップに役割がある場所では反応しない
   const handleTap = (e: React.MouseEvent) => {
-    // 傾けたあとに指を離したときのクリックは無視する
-    if (suppressClick.current) {
-      suppressClick.current = false;
-      lastTap.current = null;
-      return;
-    }
     const target = e.target as HTMLElement;
     if (target.closest('button, a, input, textarea, [data-no-flip], .MuiChip-root')) {
       lastTap.current = null;
@@ -112,48 +103,6 @@ export default function HabitCardShell({ rarity, color, intensity, paperBg, dark
     el.style.setProperty('--sheen-x', String((e.clientX - r.left) / r.width));
   };
   const handlePointerLeave = () => rootRef.current?.style.removeProperty('--sheen-x');
-
-  // 裏面(カード)を押したまま指を動かすと、指の位置に合わせてカードが傾き、光が指を追う。
-  // 表面(草グラフ)では何もしない
-  const handleTiltDown = (e: React.PointerEvent) => {
-    if (!flipped || (e.target as HTMLElement).closest('button, input, textarea')) return;
-    press.current = { id: e.pointerId, x: e.clientX, y: e.clientY, tilting: false };
-  };
-  const handleTiltMove = (e: React.PointerEvent) => {
-    const p = press.current;
-    const root = rootRef.current;
-    const tilt = tiltRef.current;
-    if (!p || p.id !== e.pointerId || !root || !tilt) return;
-    if (!p.tilting) {
-      if (Math.hypot(e.clientX - p.x, e.clientY - p.y) < 4) return;
-      p.tilting = true;
-      try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* 合成イベントなど */ }
-      tilt.style.transition = 'transform 120ms ease-out';
-    }
-    const r = root.getBoundingClientRect();
-    const px = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
-    const py = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
-    tilt.style.transform = `rotateX(${((0.5 - py) * 22).toFixed(2)}deg) rotateY(${((px - 0.5) * 26).toFixed(2)}deg) scale(1.02)`;
-    root.style.setProperty('--sheen-x', String(px));
-    root.style.setProperty('--gx', `${(px * 100).toFixed(1)}%`);
-    root.style.setProperty('--gy', `${(py * 100).toFixed(1)}%`);
-    root.style.setProperty('--glare', '1');
-  };
-  const handleTiltEnd = (e: React.PointerEvent) => {
-    const p = press.current;
-    if (!p || p.id !== e.pointerId) return;
-    press.current = null;
-    if (!p.tilting) return;
-    suppressClick.current = true;
-    setTimeout(() => { suppressClick.current = false; }, 400);
-    const tilt = tiltRef.current;
-    if (tilt) {
-      tilt.style.transition = 'transform 550ms cubic-bezier(0.2, 0.8, 0.2, 1)';
-      tilt.style.transform = '';
-    }
-    rootRef.current?.style.setProperty('--glare', '0');
-    rootRef.current?.style.removeProperty('--sheen-x');
-  };
 
   const finish = FINISH[rarity];
 
@@ -196,8 +145,6 @@ export default function HabitCardShell({ rarity, color, intensity, paperBg, dark
     transform: 'rotateY(180deg)',
     overflow: 'hidden',
     pointerEvents: flipped ? 'auto' as const : 'none' as const,
-    // 裏面では指の上下左右の動きをすべて傾けに使う(ページのスクロールにしない)
-    touchAction: flipped ? 'none' : 'auto',
     ...(finish ? {
       background: finish.background,
       backgroundBlendMode: rarity === 'holo' ? 'overlay, soft-light, normal' : 'soft-light, normal',
@@ -235,7 +182,6 @@ export default function HabitCardShell({ rarity, color, intensity, paperBg, dark
       onPointerLeave={handlePointerLeave}
       sx={{ position: 'relative', borderRadius: `${RADIUS}px`, perspective: '1400px' }}
     >
-      <Box ref={tiltRef} sx={{ position: 'relative', transformStyle: 'preserve-3d' }}>
       <Box
         sx={{
           position: 'relative',
@@ -247,28 +193,7 @@ export default function HabitCardShell({ rarity, color, intensity, paperBg, dark
         <Box sx={frontSx} aria-hidden={flipped}>
           {front}
         </Box>
-        <Box
-          sx={backSx}
-          aria-hidden={!flipped}
-          onPointerDown={handleTiltDown}
-          onPointerMove={handleTiltMove}
-          onPointerUp={handleTiltEnd}
-          onPointerCancel={handleTiltEnd}
-          // 裏面の長押しでは並べ替え(ドラッグ)を始めない。押したまま動かすのは傾けに使う
-          onTouchStart={e => { if (flipped) e.stopPropagation(); }}
-          onMouseDown={e => { if (flipped) e.stopPropagation(); }}
-        >
-          {/* 指の位置に当たる光 */}
-          <Box
-            aria-hidden
-            sx={{
-              position: 'absolute', inset: 0, zIndex: 5, pointerEvents: 'none', borderRadius: 'inherit',
-              background: 'radial-gradient(circle at var(--gx, 50%) var(--gy, 50%), rgba(255,255,255,0.9), rgba(255,255,255,0.3) 22%, transparent 50%)',
-              mixBlendMode: finish ? 'overlay' : 'soft-light',
-              opacity: 'var(--glare, 0)',
-              transition: 'opacity 300ms ease',
-            }}
-          />
+        <Box sx={backSx} aria-hidden={!flipped}>
           {finish && flipped && (
             <Box
               aria-hidden
@@ -284,7 +209,6 @@ export default function HabitCardShell({ rarity, color, intensity, paperBg, dark
             {backMounted && back}
           </Box>
         </Box>
-      </Box>
       </Box>
     </Box>
   );
