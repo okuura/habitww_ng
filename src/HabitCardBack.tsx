@@ -133,37 +133,33 @@ function Goal({ ink, color, label, lead, value, progress }: {
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
-/** 連続記録の炎。途切れているときは灰色 */
-function FireMark({ active }: { active: boolean }) {
+/** 刻印の影(text-shadow)を、アイコン用の drop-shadow に置き換える */
+const engraveFilter = (ink: Ink) =>
+  ink.textShadow === 'none'
+    ? 'none'
+    : ink.textShadow.split(/,(?![^(]*\))/).map(sh => `drop-shadow(${sh.trim()})`).join(' ');
+
+/** 連続記録の炎。文字と同じ刻印の色で、途切れているときは薄く */
+function FireMark({ ink, active }: { ink: Ink; active: boolean }) {
   return (
     <LocalFireDepartmentIcon
-      sx={{
-        fontSize: '1.15rem', ml: '-3px',
-        color: active ? '#ff6d00' : 'rgba(128,128,128,0.55)',
-        filter: active ? 'drop-shadow(0 0 3px rgba(255,145,0,0.55)) drop-shadow(0 1px 0 rgba(120,40,0,0.35))' : 'none',
-      }}
+      sx={{ fontSize: '1.15rem', ml: '-3px', color: ink.ink, opacity: active ? 1 : 0.35, filter: engraveFilter(ink) }}
     />
   );
 }
 
 /** 速攻(疾風迅雷)の稲妻。草グラフのマークと同じ形 */
-function BoltMark({ active }: { active: boolean }) {
+function BoltMark({ ink, active }: { ink: Ink; active: boolean }) {
   return (
     <Box
       component="svg"
       viewBox="0 0 24 24"
       sx={{
-        width: 17, height: 17, display: 'block', flexShrink: 0, ml: '-2px',
-        filter: active ? 'drop-shadow(0 0 3px rgba(255,200,0,0.6)) drop-shadow(0 1px 0 rgba(120,70,0,0.35))' : 'none',
+        width: 16, height: 16, display: 'block', flexShrink: 0, ml: '-1px',
+        color: ink.ink, opacity: active ? 1 : 0.35, filter: engraveFilter(ink),
       }}
     >
-      <path
-        d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"
-        fill={active ? '#ffd740' : 'rgba(128,128,128,0.4)'}
-        stroke={active ? '#ff8f00' : 'rgba(128,128,128,0.6)'}
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
+      <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z" fill="currentColor" />
     </Box>
   );
 }
@@ -230,14 +226,14 @@ export default function HabitCardBack({ habit, completions, note, onSaveNote, ac
           <Box>
             <Label ink={ink}>連続記録</Label>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25, lineHeight: 1.1 }}>
-              <FireMark active={stats.currentStreak > 0} />
+              <FireMark ink={ink} active={stats.currentStreak > 0} />
               <Figure ink={ink} value={stats.currentStreak} unit="日" size="1.15rem" />
             </Box>
           </Box>
           <Box>
             <Label ink={ink}>速攻</Label>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25, lineHeight: 1.1 }}>
-              <BoltMark active={stats.onTimeCount > 0} />
+              <BoltMark ink={ink} active={stats.onTimeCount > 0} />
               <Figure ink={ink} value={stats.onTimeCount} unit="回" size="1.15rem" />
             </Box>
           </Box>
