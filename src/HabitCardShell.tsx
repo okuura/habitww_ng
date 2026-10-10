@@ -20,6 +20,13 @@ const holoFlow = keyframes`
   100% { background-position: 300% 50%, 0 0, 0 0; }
 `;
 
+// 裏返した瞬間に光の帯が一度だけ板の上を走る
+const sweep = keyframes`
+  0%   { transform: translateX(-120%) skewX(-18deg); opacity: 0; }
+  20%  { opacity: 1; }
+  100% { transform: translateX(260%) skewX(-18deg); opacity: 0; }
+`;
+
 // テーマの borderRadius 12 × 2(元の Card と同じ)
 const RADIUS = 24;
 
@@ -187,6 +194,17 @@ export default function HabitCardShell({ rarity, color, intensity, paperBg, dark
           {front}
         </Box>
         <Box sx={backSx} aria-hidden={!flipped}>
+          {finish && flipped && (
+            <Box
+              aria-hidden
+              sx={{
+                position: 'absolute', top: 0, bottom: 0, left: 0, width: '45%', zIndex: 4, pointerEvents: 'none',
+                background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.55) 50%, transparent)',
+                mixBlendMode: 'soft-light',
+                animation: `${sweep} 1.1s cubic-bezier(0.3, 0.6, 0.3, 1) 0.4s both`,
+              }}
+            />
+          )}
           <Box sx={{ position: 'relative', zIndex: 3, height: '100%' }}>
             {backMounted && back}
           </Box>
