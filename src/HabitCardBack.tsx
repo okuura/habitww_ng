@@ -32,6 +32,7 @@ function inkOf(finish: CardFinish | null) {
     faint: finish?.inkSub ?? 'text.disabled',
     textShadow: finish?.engrave ?? 'none',
     line: finish?.line ?? 'divider',
+    lineLight: finish?.lineLight ?? 'transparent',
     track: finish?.panelBg ?? 'action.hover',
     trackShadow: finish?.panelShadow ?? 'none',
   };
@@ -178,7 +179,8 @@ export default function HabitCardBack({ habit, completions, note, onSaveNote, ac
   const medals = badges.perfectMonths.slice(-5).reverse();
   const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
   const start = stats.startDate;
-  const vline = { width: '1px', alignSelf: 'stretch', bgcolor: ink.line, flexShrink: 0 };
+  // 区切り線も板に彫り込んだ溝(右側に光)
+  const vline = { width: '1px', alignSelf: 'stretch', bgcolor: ink.line, flexShrink: 0, boxShadow: `1px 0 0 ${ink.lineLight}` };
 
   return (
     <Box
@@ -263,7 +265,7 @@ export default function HabitCardBack({ habit, completions, note, onSaveNote, ac
       </Box>
 
       {/* 次の目標 */}
-      <Box sx={{ height: '1px', bgcolor: ink.line, flexShrink: 0 }} />
+      <Box sx={{ height: '1px', bgcolor: ink.line, flexShrink: 0, boxShadow: `0 1px 0 ${ink.lineLight}` }} />
       <Box sx={{ display: 'flex', gap: 1.25, pt: 0.75, flexShrink: 0 }}>
         <Goal
           ink={ink}

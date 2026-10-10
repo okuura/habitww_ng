@@ -133,15 +133,15 @@ export default function RankUpEffect({ rankUp, onClose }: { rankUp: RankUp; onCl
             // 回転中も角の丸みの外にはみ出さない
             clipPath: 'inset(0 round 20px)',
             background: finish.background,
-            backgroundBlendMode: rankUp.rarity === 'holo' ? 'overlay, soft-light, normal' : 'soft-light, normal',
+            backgroundBlendMode: finish.blend,
             boxShadow: `0 20px 60px rgba(0,0,0,0.6), 0 0 40px ${accent[0]}66, inset 0 0 0 1px rgba(255,255,255,0.5)`,
             animation: `${plateIn} 1000ms cubic-bezier(0.2, 0.8, 0.25, 1) both`,
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 0.75,
             color: finish.ink,
             '&::before': {
               content: '""', position: 'absolute', inset: 8, borderRadius: '13px', pointerEvents: 'none',
-              border: `1.5px solid ${finish.line}`,
-              boxShadow: '1px 1px 0 rgba(255,255,255,0.55), inset 1px 1px 0 rgba(255,255,255,0.55)',
+              border: `2px solid ${finish.line}`,
+              boxShadow: `0 1px 0 ${finish.lineLight}, inset 0 1px 0 ${finish.lineLight}`,
             },
           }}
         >

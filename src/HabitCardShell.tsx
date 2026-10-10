@@ -15,9 +15,9 @@ const rainbowShift = keyframes`
   100% { background-position: 300% 50%; }
 `;
 // ホロの虹の層だけをゆっくり流す(下の 2 層は固定)
-const holoFlow = keyframes`
-  0%   { background-position: 0% 50%, 0 0, 0 0; }
-  100% { background-position: 300% 50%, 0 0, 0 0; }
+const holoFlow = (layers: number) => keyframes`
+  0%   { background-position: 0% 50%${', 0 0'.repeat(layers - 1)}; }
+  100% { background-position: 300% 50%${', 0 0'.repeat(layers - 1)}; }
 `;
 
 // 裏返した瞬間に光の帯が一度だけ板の上を走る
@@ -147,16 +147,17 @@ export default function HabitCardShell({ rarity, color, intensity, paperBg, dark
     pointerEvents: flipped ? 'auto' as const : 'none' as const,
     ...(finish ? {
       background: finish.background,
-      backgroundBlendMode: rarity === 'holo' ? 'overlay, soft-light, normal' : 'soft-light, normal',
-      ...(rarity === 'holo' ? { backgroundSize: '300% 100%, 600px 300px, 100% 100%', animation: `${holoFlow} 8s linear infinite` } : {}),
+      backgroundBlendMode: finish.blend,
+      ...(rarity === 'holo' ? { animation: `${holoFlow(finish.layers)} 8s linear infinite` } : {}),
       color: finish.ink,
       // 板の縁の面取り
       boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.45), inset 0 -2px 4px rgba(60,40,0,0.25), inset 0 2px 3px rgba(255,255,255,0.35)',
       // 内側の彫り線(刻印の枠)
       '&::before': {
         content: '""', position: 'absolute', inset: 7, borderRadius: `${RADIUS - 7}px`, pointerEvents: 'none', zIndex: 1,
-        border: `1.5px solid ${finish.line}`,
-        boxShadow: '1px 1px 0 rgba(255,255,255,0.55), inset 1px 1px 0 rgba(255,255,255,0.55)',
+        // 彫り込んだ溝: 線の上側は影、下側(と内側の下)に光
+        border: `2px solid ${finish.line}`,
+        boxShadow: `0 1px 0 ${finish.lineLight}, inset 0 1px 0 ${finish.lineLight}, inset 0 2px 3px rgba(0,0,0,0.12)`,
       },
       // 光沢(指の位置 → なければスクロール位置に合わせて動く)
       '&::after': {
