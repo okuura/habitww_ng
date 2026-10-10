@@ -3,13 +3,12 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import TextField from '@mui/material/TextField';
 import LinearProgress from '@mui/material/LinearProgress';
-import { alpha, type Theme } from '@mui/material/styles';
 import type { Habit, HabitCompletion, HabitNote } from './supabase';
-import { computeHabitBadges, habitStats, rarityOf } from './habitStats';
+import { computeHabitBadges, habitStats, rarityOf, type Rarity } from './habitStats';
 import { Medal } from './Badges';
 import { FINISH, type CardFinish } from './cardFinish';
 
-// 習慣カードの裏面: 理想の姿(本人だけのメモ)と、この習慣の記録・レアリティ・月間メダル。
+// 習慣カードの裏面: 理想の姿(本人だけのメモ)と、この習慣の記録・月間メダル・次の目標。
 // 表面と同じ大きさに収める。シルバー以上は金属の板に刻印した見た目
 
 interface HabitCardBackProps {
@@ -18,27 +17,27 @@ interface HabitCardBackProps {
   completions: HabitCompletion[];
   note: HabitNote | undefined;
   onSaveNote: (patch: { why?: string; ideal?: string }) => void;
-  /** 表面と同じ見出し行(名前・↻・︙) */
-  header: ReactNode;
+  /** 見出し行の右端に置くボタン(↻・︙) */
+  actions: ReactNode;
 }
 
-const RARITY_COLOR = { normal: '#9e9e9e', silver: '#9aa5b4', gold: '#d9a93a', holo: '#a18cff' } as const;
+const RARITY_NAME: Record<Rarity, string> = { normal: 'NORMAL', silver: 'SILVER', gold: 'GOLD', holo: 'HOLO' };
 
-/** 裏面の文字・彫り込み面の色。ノーマルは紙のまま(テーマの色) */
+/** 裏面の文字・区切り線の色。ノーマルは紙のまま(テーマの色) */
 function inkOf(finish: CardFinish | null) {
   return {
     ink: finish?.ink ?? 'text.primary',
     sub: finish?.inkSub ?? 'text.secondary',
     faint: finish?.inkSub ?? 'text.disabled',
     textShadow: finish?.engrave ?? 'none',
-    panel: finish
-      ? { bgcolor: finish.panelBg, boxShadow: finish.panelShadow }
-      : { bgcolor: (theme: Theme) => alpha(theme.palette.text.primary, 0.04) },
+    line: finish?.line ?? 'divider',
+    track: finish?.panelBg ?? 'action.hover',
+    trackShadow: finish?.panelShadow ?? 'none',
   };
 }
 type Ink = ReturnType<typeof inkOf>;
 
-/** タップで編集、フォーカスが外れたら保存。表示は 2 行まで。入力欄は 16px(iOS が拡大しないように) */
+/** タップで編集、フォーカスが外れたら保存。表示は 1 行(あふれたら …)。入力欄は 16px(iOS が拡大しないように) */
 function EditableNote({ value, placeholder, headline, ink, onSave }: {
   value: string; placeholder: string;
   /** 理想の姿: 大きめの刻印として見せる */
@@ -54,6 +53,7 @@ function EditableNote({ value, placeholder, headline, ink, onSave }: {
         autoFocus
         fullWidth
         size="small"
+        variant="standard"
         value={draft}
         placeholder={placeholder}
         onChange={e => setDraft(e.target.value)}
@@ -66,7 +66,7 @@ function EditableNote({ value, placeholder, headline, ink, onSave }: {
           if (e.key === 'Escape') { setDraft(value); setEditing(false); }
         }}
         inputProps={{ maxLength: 80, sx: { fontSize: '16px', color: ink.ink } }}
-        sx={{ '& .MuiOutlinedInput-root': { ...ink.panel, borderRadius: 1.5 } }}
+        sx={{ '& .MuiInput-root': { color: ink.ink } }}
       />
     );
   }
@@ -76,14 +76,11 @@ function EditableNote({ value, placeholder, headline, ink, onSave }: {
       variant="body2"
       onClick={() => { setDraft(value); setEditing(true); }}
       sx={{
-        cursor: 'text', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', lineHeight: 1.6,
-        display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, overflow: 'hidden',
-        px: 1.25, py: 0.75, borderRadius: 1.5,
-        ...ink.panel,
+        cursor: 'text', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.5,
         color: value ? ink.ink : ink.faint,
         textShadow: ink.textShadow,
         fontStyle: value ? 'normal' : 'italic',
-        ...(headline && value ? { fontSize: '1.05rem', fontWeight: 800, letterSpacing: '0.02em', lineHeight: 1.45 } : {}),
+        ...(headline && value ? { fontSize: '0.92rem', fontWeight: 700, letterSpacing: '0.02em' } : {}),
       }}
     >
       {value || placeholder}
@@ -91,19 +88,48 @@ function EditableNote({ value, placeholder, headline, ink, onSave }: {
   );
 }
 
-function StatTile({ label, value, sub, ink }: { label: string; value: string; sub?: string; ink: Ink }) {
+function Label({ ink, children }: { ink: Ink; children: ReactNode }) {
   return (
-    <Box sx={{ px: 0.5, py: 0.75, borderRadius: 1.5, ...ink.panel, textAlign: 'center', textShadow: ink.textShadow }}>
-      <Typography sx={{ fontSize: '0.6rem', color: ink.sub, fontWeight: 600 }}>{label}</Typography>
-      <Typography sx={{ fontSize: '1rem', fontWeight: 800, lineHeight: 1.3, color: ink.ink }}>{value}</Typography>
-      {sub && <Typography sx={{ fontSize: '0.56rem', color: ink.faint }}>{sub}</Typography>}
+    <Typography noWrap sx={{ fontSize: '0.62rem', fontWeight: 700, color: ink.sub, textShadow: ink.textShadow, lineHeight: 1.4 }}>
+      {children}
+    </Typography>
+  );
+}
+
+/** 数字を大きく、単位を小さく */
+function Figure({ ink, value, unit, size }: { ink: Ink; value: string | number; unit: string; size: string }) {
+  return (
+    <Box component="span" sx={{ color: ink.ink, textShadow: ink.textShadow, whiteSpace: 'nowrap' }}>
+      <Box component="span" sx={{ fontSize: size, fontWeight: 800, letterSpacing: '-0.02em' }}>{value}</Box>
+      <Box component="span" sx={{ fontSize: '0.72rem', fontWeight: 700, ml: '2px' }}>{unit}</Box>
     </Box>
   );
 }
 
-const percent = (v: number | null) => (v === null ? '—' : `${Math.round(v * 100)}%`);
+function Goal({ ink, color, label, lead, value, progress }: {
+  ink: Ink; color: string; label: string; lead: string; value: number | null; progress: number;
+}) {
+  return (
+    <Box sx={{ flex: 1, minWidth: 0 }}>
+      <Label ink={ink}>{label}</Label>
+      <Typography noWrap sx={{ fontSize: '0.72rem', fontWeight: 700, color: ink.ink, textShadow: ink.textShadow, lineHeight: 1.3 }}>
+        {lead}{value !== null && <> あと<Figure ink={ink} value={value} unit="日" size="1.05rem" /></>}
+      </Typography>
+      <LinearProgress
+        variant="determinate"
+        value={Math.min(100, Math.max(0, progress * 100))}
+        sx={{
+          mt: 0.5, height: 5, borderRadius: 3, bgcolor: ink.track, boxShadow: ink.trackShadow,
+          '& .MuiLinearProgress-bar': { borderRadius: 3, bgcolor: color },
+        }}
+      />
+    </Box>
+  );
+}
 
-export default function HabitCardBack({ habit, completions, note, onSaveNote, header }: HabitCardBackProps) {
+const pad = (n: number) => String(n).padStart(2, '0');
+
+export default function HabitCardBack({ habit, completions, note, onSaveNote, actions }: HabitCardBackProps) {
   const today = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
   const stats = useMemo(() => habitStats(habit, completions, today), [habit, completions, today]);
   const badges = useMemo(
@@ -113,87 +139,108 @@ export default function HabitCardBack({ habit, completions, note, onSaveNote, he
   const rarity = rarityOf(stats.totalDays);
   const finish = FINISH[rarity.rarity];
   const ink = inkOf(finish);
-  const metal = !!finish;
-  // 新しい月から並べ、入りきらない古いメダルは右端で切れる
-  const medals = [...badges.perfectMonths].reverse();
+  // 直近 3 つ(新しい月から)
+  const medals = badges.perfectMonths.slice(-3).reverse();
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  const start = stats.startDate;
+  const vline = { width: '1px', alignSelf: 'stretch', bgcolor: ink.line, flexShrink: 0 };
 
   return (
     <Box
       sx={{
-        // 表面と同じ大きさに収める(スクロールしない)。理想の姿が伸び縮みして残りを下に詰める
-        height: '100%', display: 'flex', flexDirection: 'column', gap: 1,
-        px: 2.25, pt: 1.5, pb: 1.75, position: 'relative', color: ink.ink, overflow: 'hidden',
-        ...(metal ? {
-          // 見出し行(名前・↻・︙)も刻印の色に
-          '& .MuiIconButton-root': { color: ink.sub },
-          '& > :first-of-type .MuiTypography-root': { color: ink.ink, textShadow: ink.textShadow },
-        } : {}),
+        // 表面と同じ大きさに収める(スクロールしない)
+        height: '100%', display: 'flex', flexDirection: 'column',
+        px: 2.25, pt: 1.25, pb: 1.75, position: 'relative', color: ink.ink, overflow: 'hidden',
+        ...(finish ? { '& .MuiIconButton-root': { color: ink.sub } } : {}),
       }}
     >
-      {header}
-
-      <Box sx={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center' }}>
-        <Box sx={{ width: '100%' }}>
-          <EditableNote
-            headline
-            ink={ink}
-            value={note?.ideal ?? ''}
-            placeholder="理想の姿は？(タップして書く)"
-            onSave={ideal => onSaveNote({ ideal })}
-          />
-        </Box>
+      {/* 見出し: 名前・レアリティ・↻・︙ */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+        <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: habit.color, flexShrink: 0 }} />
+        <Typography noWrap sx={{ fontWeight: 800, fontSize: '1.1rem', flex: 1, minWidth: 0, color: ink.ink, textShadow: ink.textShadow }}>
+          {habit.name}
+        </Typography>
+        <Typography sx={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.3em', color: ink.sub, textShadow: ink.textShadow, flexShrink: 0 }}>
+          {RARITY_NAME[rarity.rarity]}
+        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', flexShrink: 0, mr: -0.75 }}>{actions}</Box>
       </Box>
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 0.75, flexShrink: 0 }}>
-        <StatTile
+      {/* 理想の姿 */}
+      <Box sx={{ mt: 0.25, minWidth: 0 }}>
+        <EditableNote
+          headline
           ink={ink}
-          label="始めた日"
-          value={`${stats.startDate.getMonth() + 1}/${stats.startDate.getDate()}`}
-          sub={`${stats.daysSinceStart}日目`}
+          value={note?.ideal ?? ''}
+          placeholder="理想の姿は？(タップして書く)"
+          onSave={ideal => onSaveNote({ ideal })}
         />
-        <StatTile ink={ink} label="累計" value={`${stats.totalDays}日`} sub={rarity.label} />
-        <StatTile ink={ink} label="今月" value={percent(stats.monthRate)} sub={`${stats.monthDone}/${stats.monthDays}日`} />
       </Box>
 
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flexShrink: 0, height: 40 }}>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <LinearProgress
-            variant="determinate"
-            value={rarity.progress * 100}
-            sx={{
-              height: 6, borderRadius: 3,
-              ...(metal ? ink.panel : { bgcolor: 'action.hover' }),
-              '& .MuiLinearProgress-bar': {
-                borderRadius: 3,
-                bgcolor: metal ? alpha(finish.ink, 0.7) : RARITY_COLOR[rarity.next?.rarity ?? rarity.rarity],
-              },
-            }}
-          />
-          {[
-            rarity.next ? `${rarity.next.label}まで あと${rarity.daysToNext}日` : '最高レアリティ',
-            badges.ongoingDaysLeft !== null ? `${today.getMonth() + 1}月のメダルまで あと${badges.ongoingDaysLeft}日` : null,
-          ].filter(Boolean).map((line, i) => (
-            <Typography
-              key={i}
-              noWrap
-              sx={{ mt: i === 0 ? 0.5 : 0, lineHeight: 1.35, color: ink.sub, textShadow: ink.textShadow, fontSize: '0.62rem', fontWeight: 600 }}
-            >
-              {line}
-            </Typography>
-          ))}
+      {/* 累計 | 連続・速攻 | 獲得メダル */}
+      <Box sx={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', gap: 1.25, py: 0.75 }}>
+        <Box sx={{ flexShrink: 0 }}>
+          <Label ink={ink}>累計実施</Label>
+          <Box sx={{ lineHeight: 1.05 }}><Figure ink={ink} value={stats.totalDays} unit="回" size="2.1rem" /></Box>
+          <Typography noWrap sx={{ fontSize: '0.6rem', fontWeight: 600, color: ink.sub, textShadow: ink.textShadow }}>
+            始めた日 {start.getFullYear()}.{pad(start.getMonth() + 1)}.{pad(start.getDate())}
+          </Typography>
         </Box>
-        {(badges.ongoingDaysLeft !== null || medals.length > 0) && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25, maxWidth: '55%', overflow: 'hidden', flexShrink: 0 }}>
-            {badges.ongoingDaysLeft !== null && (
-              <Box sx={{ width: 30, height: 39, flexShrink: 0, lineHeight: 0, '& svg': { width: 30, height: 39 } }}>
-                <Medal color={habit.color} value={String(today.getMonth() + 1)} unit="月" year={String(today.getFullYear())} ongoing />
-              </Box>
+        <Box sx={vline} />
+        <Box sx={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+          <Box>
+            <Label ink={ink}>連続記録</Label>
+            <Box sx={{ lineHeight: 1.1 }}><Figure ink={ink} value={stats.currentStreak} unit="日" size="1.15rem" /></Box>
+          </Box>
+          <Box>
+            <Label ink={ink}>速攻</Label>
+            <Box sx={{ lineHeight: 1.1 }}><Figure ink={ink} value={stats.onTimeCount} unit="回" size="1.15rem" /></Box>
+          </Box>
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+          <Label ink={ink}>獲得メダル</Label>
+          <Box sx={{ display: 'flex', gap: 0.5, mt: 0.25, minHeight: 39 }}>
+            {medals.length === 0 && (
+              <Typography sx={{ fontSize: '0.6rem', color: ink.faint, textShadow: ink.textShadow, alignSelf: 'center' }}>
+                まだありません
+              </Typography>
             )}
             {medals.map(b => (
               <Box key={`${b.year}-${b.month}`} sx={{ width: 30, height: 39, flexShrink: 0, lineHeight: 0, '& svg': { width: 30, height: 39 } }}>
                 <Medal color={habit.color} value={String(b.month)} unit="月" year={String(b.year)} />
               </Box>
             ))}
+          </Box>
+        </Box>
+      </Box>
+
+      {/* 次の目標 */}
+      <Box sx={{ height: '1px', bgcolor: ink.line, flexShrink: 0 }} />
+      <Box sx={{ display: 'flex', gap: 1.25, pt: 0.75, flexShrink: 0 }}>
+        <Goal
+          ink={ink}
+          color={habit.color}
+          label="次のカードランク"
+          lead={rarity.next ? `${rarity.next.label}まで` : '最高ランクに到達！'}
+          value={rarity.daysToNext}
+          progress={rarity.next ? rarity.progress : 1}
+        />
+        <Box sx={vline} />
+        {badges.ongoingDaysLeft !== null ? (
+          <Goal
+            ink={ink}
+            color={habit.color}
+            label="次のメダル"
+            lead={`${today.getMonth() + 1}月`}
+            value={badges.ongoingDaysLeft}
+            progress={1 - badges.ongoingDaysLeft / daysInMonth}
+          />
+        ) : (
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Label ink={ink}>次のメダル</Label>
+            <Typography sx={{ fontSize: '0.68rem', fontWeight: 700, color: ink.sub, textShadow: ink.textShadow, lineHeight: 1.4 }}>
+              来月1日から毎日続けると獲得
+            </Typography>
           </Box>
         )}
       </Box>

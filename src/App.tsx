@@ -1160,15 +1160,7 @@ function AppContent() {
                             completions={completionsOf(habit.id)}
                             note={notes.get(habit.id)}
                             onSaveNote={patch => handleSaveNote(habit.id, patch)}
-                            header={
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: habit.color, flexShrink: 0 }} />
-                                <Typography variant="body1" sx={{ fontWeight: 700, flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
-                                  {habit.name}
-                                </Typography>
-                                {cardButtons(habit.id, isShared)}
-                              </Box>
-                            }
+                            actions={cardButtons(habit.id, isShared)}
                           />
                         </Suspense>
                       }
