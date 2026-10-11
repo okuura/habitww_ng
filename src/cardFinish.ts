@@ -12,11 +12,11 @@ export interface CardFinish {
   blend: string;
   /** background のレイヤー数(ホロの虹だけを流すアニメーション用) */
   layers: number;
-  /** 刻印の文字色。半透明にして、文字の中にも地のヘアラインが透けるようにする */
+  /** 刻印の文字色(小さな文字も滲まないよう、ほぼ不透明にする) */
   ink: string;
   /** 刻印の補助文字色 */
   inkSub: string;
-  /** 刻印らしく見せる影(上の縁に影、下の縁に光 = 金属に彫り込んだ形) */
+  /** 刻印らしく見せる影(下の縁に薄い光だけ。上にも影を入れると文字が二重になって滲む) */
   engrave: string;
   /** 一段彫り込んだ面(進み具合のバー) */
   panelBg: string;
@@ -85,9 +85,9 @@ export const FINISH: Record<Rarity, CardFinish | null> = {
   bronze: {
     metal: true,
     ...metal('linear-gradient(172deg, #7a4a22 0%, #b07440 14%, #dca06a 32%, #b5773f 50%, #d39560 68%, #a0652f 84%, #6f421d 100%)'),
-    ink: 'rgba(62,30,6,0.62)',
-    inkSub: 'rgba(62,30,6,0.5)',
-    engrave: '0 -1px 0 rgba(45,20,0,0.45), 0 1px 0 rgba(255,214,175,0.7)',
+    ink: 'rgba(62,30,6,0.9)',
+    inkSub: 'rgba(62,30,6,0.72)',
+    engrave: '0 1px 0 rgba(255,214,175,0.45)',
     panelBg: 'rgba(80,40,10,0.12)',
     panelShadow: 'inset 0 1px 1px rgba(50,22,0,0.5), 0 1px 0 rgba(255,214,175,0.55)',
     line: 'rgba(60,28,4,0.5)',
@@ -97,9 +97,9 @@ export const FINISH: Record<Rarity, CardFinish | null> = {
   silver: {
     metal: true,
     ...metal('linear-gradient(172deg, #9aa3ae 0%, #d9dde3 16%, #f4f6f8 34%, #c3c9d1 52%, #e9ecf0 70%, #a4adb8 100%)'),
-    ink: 'rgba(40,48,60,0.55)',
-    inkSub: 'rgba(40,48,60,0.45)',
-    engrave: '0 -1px 0 rgba(20,26,36,0.35), 0 1px 0 rgba(255,255,255,0.85)',
+    ink: 'rgba(40,48,60,0.88)',
+    inkSub: 'rgba(40,48,60,0.7)',
+    engrave: '0 1px 0 rgba(255,255,255,0.55)',
     panelBg: 'rgba(60,70,85,0.1)',
     panelShadow: 'inset 0 1px 1px rgba(20,26,36,0.4), 0 1px 0 rgba(255,255,255,0.75)',
     line: 'rgba(40,48,60,0.42)',
@@ -109,9 +109,9 @@ export const FINISH: Record<Rarity, CardFinish | null> = {
   gold: {
     metal: true,
     ...metal('linear-gradient(172deg, #a87508 0%, #d8a823 14%, #f4d659 32%, #d9ad26 50%, #efcc48 68%, #c8961b 84%, #9a6a05 100%)'),
-    ink: 'rgba(92,58,0,0.55)',
-    inkSub: 'rgba(92,58,0,0.45)',
-    engrave: '0 -1px 0 rgba(70,40,0,0.55), 0 1px 0 rgba(255,244,190,0.9)',
+    ink: 'rgba(84,52,0,0.9)',
+    inkSub: 'rgba(84,52,0,0.72)',
+    engrave: '0 1px 0 rgba(255,244,190,0.5)',
     panelBg: 'rgba(110,78,8,0.12)',
     panelShadow: 'inset 0 1px 1px rgba(80,52,0,0.5), 0 1px 0 rgba(255,244,196,0.7)',
     line: 'rgba(84,56,0,0.5)',
@@ -121,9 +121,9 @@ export const FINISH: Record<Rarity, CardFinish | null> = {
   holo: {
     metal: true,
     ...metal('linear-gradient(172deg, #a7aebb 0%, #e3e6ec 18%, #fafbfc 36%, #cfd4dc 54%, #eef0f4 72%, #aeb5c1 100%)', true),
-    ink: 'rgba(40,32,90,0.55)',
-    inkSub: 'rgba(40,32,90,0.45)',
-    engrave: '0 -1px 0 rgba(30,22,70,0.35), 0 1px 0 rgba(255,255,255,0.85)',
+    ink: 'rgba(40,32,90,0.88)',
+    inkSub: 'rgba(40,32,90,0.7)',
+    engrave: '0 1px 0 rgba(255,255,255,0.55)',
     panelBg: 'rgba(70,60,130,0.1)',
     panelShadow: 'inset 0 1px 1px rgba(30,22,70,0.4), 0 1px 0 rgba(255,255,255,0.75)',
     line: 'rgba(40,32,90,0.42)',
