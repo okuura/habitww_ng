@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
@@ -10,7 +10,7 @@ import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import type { Habit, HabitCompletion } from './supabase';
 import InsightCards from './InsightCards';
-import { pickInsights } from './insights';
+import { pickInsights, recentInsightIds, rememberShownInsights } from './insights';
 import { HabitComparison, PersonalBestTiles } from './PersonalRecords';
 import MonthlyReviewEntry from './MonthlyReview';
 import HabitTimes from './HabitTimes';
@@ -36,8 +36,14 @@ export default function StatsPage({ habits, completions }: StatsPageProps) {
   const achievements = useMemo(() => {
     const ctx = buildContext(habits, completions);
     const evaluated = evaluateAll(ctx);
-    return { ctx, evaluated, goals: nearGoals(ctx, evaluated), insights: pickInsights(ctx) };
+    // 昨日・一昨日に出した気づきは後ろに回して、毎日入れ替わるようにする
+    const insights = pickInsights(ctx, recentInsightIds(ctx.todayStr));
+    return { ctx, evaluated, goals: nearGoals(ctx, evaluated), insights };
   }, [habits, completions]);
+
+  useEffect(() => {
+    rememberShownInsights(achievements.ctx.todayStr, achievements.insights);
+  }, [achievements]);
 
   // --- Time of day ---
   const timeOfDay = useMemo(() => {

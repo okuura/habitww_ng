@@ -3,7 +3,7 @@ import { rarityOf } from './habitStats';
 import { clock, habitTimeProfiles } from './timeStats';
 
 // データページの「気づき」: 記録から計算した、本人もまだ気づいていないかもしれない豆知識。
-// 条件を満たす候補だけを集め、日付を種にして選ぶ(同じ日は同じカード)
+// 条件を満たす候補だけを集め、日付を種にして選ぶ(同じ日は同じカード、日が変わると入れ替わる)
 
 /** 文と、強調する部分(em) */
 export type InsightPart = string | { em: string };
@@ -239,19 +239,61 @@ export function allInsights(ctx: AchievementContext): Insight[] {
   return [weekday, breaks, timeShift, schedule, pair, forecast, memory, monthRecord, activity].flatMap(f => f(ctx));
 }
 
-/** 今日見せる気づき(同じ日は同じ並び。同じ種類は 2 枚まで) */
-export function pickInsights(ctx: AchievementContext, limit = 5): Insight[] {
-  const ranked = allInsights(ctx)
-    .map(i => ({ i, score: i.weight * (0.5 + seeded(ctx.todayStr + i.id)) }))
-    .sort((a, b) => b.score - a.score);
-  const perKind = new Map<string, number>();
+/** 日付を種にして候補を並べる(重みが大きいほど、乱数が良いほど前。最近出したものは後ろ) */
+function rank(candidates: Insight[], dateStr: string, recent: Set<string>) {
+  return candidates
+    .map(i => ({ i, score: i.weight * (0.3 + seeded(dateStr + i.id)) * (recent.has(i.id) ? 0.1 : 1) }))
+    .sort((a, b) => b.score - a.score)
+    .map(({ i }) => i);
+}
+
+/**
+ * 今日見せる気づき。同じ日は同じ並び、日が変わると入れ替わる。
+ * 最大 3 枚、同じ種類は 1 枚まで。`recent`(最近の日に実際に出した候補の id)は後ろに回し、
+ * 毎日新鮮に見えるようにする。候補が少ないときは、後ろに回した候補も繰り上がる
+ */
+export function pickInsights(ctx: AchievementContext, recent: Set<string> = new Set(), limit = 3): Insight[] {
+  const kinds = new Set<string>();
   const out: Insight[] = [];
-  for (const { i } of ranked) {
-    const n = perKind.get(i.kind) ?? 0;
-    if (n >= 2) continue;
-    perKind.set(i.kind, n + 1);
+  for (const i of rank(allInsights(ctx), ctx.todayStr, recent)) {
+    if (kinds.has(i.kind)) continue;
+    kinds.add(i.kind);
     out.push(i);
     if (out.length >= limit) break;
   }
   return out;
+}
+
+// --- 出した履歴(端末に保存。昨日・一昨日に出した候補を今日は後ろに回すため) ---------------
+
+const HISTORY_KEY = 'habitww-insights-shown';
+const HISTORY_DAYS = 2;
+
+type ShownHistory = Record<string, string[]>; // 日付 -> その日に出した id
+
+function readHistory(): ShownHistory {
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '{}') as ShownHistory;
+  } catch {
+    return {};
+  }
+}
+
+/** 今日より前の、直近 HISTORY_DAYS 日に出した id */
+export function recentInsightIds(todayStr: string): Set<string> {
+  const from = addDays(todayStr, -HISTORY_DAYS);
+  const out = new Set<string>();
+  for (const [date, ids] of Object.entries(readHistory())) {
+    if (date >= from && date < todayStr) for (const id of ids) out.add(id);
+  }
+  return out;
+}
+
+/** 今日出した id を覚える(古い日は捨てる) */
+export function rememberShownInsights(todayStr: string, insights: Insight[]) {
+  const from = addDays(todayStr, -HISTORY_DAYS);
+  const kept: ShownHistory = {};
+  for (const [date, ids] of Object.entries(readHistory())) if (date >= from && date < todayStr) kept[date] = ids;
+  kept[todayStr] = insights.map(i => i.id);
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(kept)); } catch { /* 容量不足などは無視 */ }
 }
