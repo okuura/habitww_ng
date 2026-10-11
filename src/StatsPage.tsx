@@ -12,6 +12,8 @@ import type { Habit, HabitCompletion } from './supabase';
 import AchievementDots from './AchievementDots';
 import AchievementBook from './AchievementBook';
 import NearGoals from './NearGoals';
+import InsightCards from './InsightCards';
+import { pickInsights } from './insights';
 import { buildContext, evaluateAll, nearGoals } from './achievements';
 
 interface StatsPageProps {
@@ -33,7 +35,7 @@ export default function StatsPage({ habits, completions }: StatsPageProps) {
   const achievements = useMemo(() => {
     const ctx = buildContext(habits, completions);
     const evaluated = evaluateAll(ctx);
-    return { ctx, evaluated, goals: nearGoals(ctx, evaluated) };
+    return { ctx, evaluated, goals: nearGoals(ctx, evaluated), insights: pickInsights(ctx) };
   }, [habits, completions]);
 
   // --- Time of day ---
@@ -84,7 +86,19 @@ export default function StatsPage({ habits, completions }: StatsPageProps) {
         </Card>
       )}
 
-      {/* 2. バッジ図鑑 */}
+      {/* 2. 今日の気づき */}
+      {achievements.insights.length > 0 && (
+        <Card
+          elevation={0}
+          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2 }}
+        >
+          <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+            <InsightCards insights={achievements.insights} />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 3. バッジ図鑑 */}
       <Card
         elevation={0}
         sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2 }}

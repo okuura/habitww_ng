@@ -6,13 +6,13 @@ import { computeHabitBadges, rarityOf, RARITY_TIERS, toLocalDateString, type Mon
 
 // --- 日付の小道具 -------------------------------------------------------------
 
-const parse = (ds: string) => new Date(ds + 'T00:00:00');
-const addDays = (ds: string, n: number) => {
+export const parse = (ds: string) => new Date(ds + 'T00:00:00');
+export const addDays = (ds: string, n: number) => {
   const d = parse(ds);
   d.setDate(d.getDate() + n);
   return toLocalDateString(d);
 };
-const daysBetween = (a: string, b: string) => Math.round((parse(b).getTime() - parse(a).getTime()) / 86400000);
+export const daysBetween = (a: string, b: string) => Math.round((parse(b).getTime() - parse(a).getTime()) / 86400000);
 
 /** 並べた日付の n 番目(1 始まり)。届いていなければ undefined */
 const nth = (sorted: string[], n: number) => sorted[n - 1];
@@ -56,7 +56,7 @@ export interface AchievementContext {
   onTimeDates: string[];
   bacchiriDates: string[];
   /** あとから付けた記録を除いた実施時刻(その日のうちに付けた記録だけ) */
-  timed: { date: string; hour: number; minute: number }[];
+  timed: { habitId: string; date: string; hour: number; minute: number }[];
   /** その日にある習慣を全部実施した日(昇順) */
   perfectDays: string[];
   /** 月間パーフェクトの月末日(昇順)と月 */
@@ -96,7 +96,7 @@ export function buildContext(habits: Habit[], completions: HabitCompletion[], no
   for (const c of mine) {
     const at = new Date(c.created_at);
     if (Number.isNaN(at.getTime()) || toLocalDateString(at) !== c.completed_date) continue;
-    timed.push({ date: c.completed_date, hour: at.getHours(), minute: at.getMinutes() });
+    timed.push({ habitId: c.habit_id, date: c.completed_date, hour: at.getHours(), minute: at.getMinutes() });
   }
   timed.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
@@ -429,9 +429,11 @@ export function nearGoals(ctx: AchievementContext, evaluated: EvaluatedAchieveme
   for (const a of evaluated) {
     const { earned, current, target, habit } = a.state;
     // カードランクと月間パーフェクトは、習慣ごとに下で出す(月の途中から「あと1回」とは言えない)
-    if (earned || a.hidden || a.category === 'rank' || a.category === 'month' || current === undefined || !target) continue;
+    // 習慣を増やすだけのバッジは、目標として勧めない
+    if (earned || a.hidden || a.category === 'rank' || a.category === 'month' || a.category === 'collector' || current === undefined || !target) continue;
     const left = target - current;
-    if (left <= 0 || (left > 3 && current / target < 0.7)) continue;
+    // あと 3 以内か、8 割まで来ていてあと 10 以内
+    if (left <= 0 || (left > 3 && (current / target < 0.8 || left > 10))) continue;
     const helpsToday = left === 1 && open && DAILY.includes(a.category)
       && (!habit || !ctx.habits.find(h => h.habit.id === habit.id)?.doneToday);
     goals.push({
@@ -449,7 +451,7 @@ export function nearGoals(ctx: AchievementContext, evaluated: EvaluatedAchieveme
         progress: r.progress, icon: `rank-${r.next.rarity}`, habit: h.habit, today: r.daysToNext === 1 && !h.doneToday,
       });
     }
-    if (h.ongoingDaysLeft !== null) {
+    if (h.ongoingDaysLeft !== null && h.ongoingDaysLeft <= 10) {
       const monthDays = new Date(ctx.today.getFullYear(), ctx.today.getMonth() + 1, 0).getDate();
       goals.push({
         id: `month-${h.habit.id}`, title: `${ctx.today.getMonth() + 1}月のパーフェクト`, remaining: h.ongoingDaysLeft, unit: '日',
