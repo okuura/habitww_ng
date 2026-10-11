@@ -14,6 +14,7 @@ import AchievementBook from './AchievementBook';
 import NearGoals from './NearGoals';
 import InsightCards from './InsightCards';
 import { pickInsights } from './insights';
+import { HabitComparison, PersonalBestTiles } from './PersonalRecords';
 import { buildContext, evaluateAll, nearGoals } from './achievements';
 
 interface StatsPageProps {
@@ -108,7 +109,29 @@ export default function StatsPage({ habits, completions }: StatsPageProps) {
         </CardContent>
       </Card>
 
-      {/* 3. Total effort — dot visualisation (overflow visible so the party spills out) */}
+      {/* 4. 自己ベスト */}
+      {achievements.ctx.allCompletionDates.length > 0 && (
+        <Card
+          elevation={0}
+          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2 }}
+        >
+          <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+            <PersonalBestTiles ctx={achievements.ctx} />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 5. 習慣くらべ */}
+      <Card
+        elevation={0}
+        sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2 }}
+      >
+        <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+          <HabitComparison habits={habits} completions={completions} />
+        </CardContent>
+      </Card>
+
+      {/* 6. Total effort — dot visualisation (overflow visible so the party spills out) */}
       <Card
         elevation={0}
         sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2, overflow: 'visible' }}
@@ -118,7 +141,7 @@ export default function StatsPage({ habits, completions }: StatsPageProps) {
         </CardContent>
       </Card>
 
-      {/* 4. Time of day */}
+      {/* 7. Time of day */}
       <Card
         elevation={0}
         sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2 }}
