@@ -55,7 +55,7 @@ export interface AchievementContext {
   allCompletionDates: string[];
   onTimeDates: string[];
   bacchiriDates: string[];
-  /** あとから付けた記録を除いた実施時刻(その日のうちに付けた記録だけ) */
+  /** あとから付けた記録を除いた実施時刻(その日のうちか、翌 4 時までに付けた記録だけ) */
   timed: { habitId: string; date: string; hour: number; minute: number }[];
   /** その日にある習慣を全部実施した日(昇順) */
   perfectDays: string[];
@@ -95,7 +95,12 @@ export function buildContext(habits: Habit[], completions: HabitCompletion[], no
   const timed: AchievementContext['timed'] = [];
   for (const c of mine) {
     const at = new Date(c.created_at);
-    if (Number.isNaN(at.getTime()) || toLocalDateString(at) !== c.completed_date) continue;
+    if (Number.isNaN(at.getTime())) continue;
+    // その日のうちに付けた記録と、日付が変わった直後(翌 4 時まで)に前の日の分として付けた記録は、
+    // 付けた時刻を実施した時刻とみなす。それより後にまとめて付けた記録は除く
+    const sameDay = toLocalDateString(at) === c.completed_date;
+    const justAfterMidnight = toLocalDateString(at) === addDays(c.completed_date, 1) && at.getHours() < 4;
+    if (!sameDay && !justAfterMidnight) continue;
     timed.push({ habitId: c.habit_id, date: c.completed_date, hour: at.getHours(), minute: at.getMinutes() });
   }
   timed.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
