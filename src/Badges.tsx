@@ -81,41 +81,59 @@ export function Medal({ color, value, unit, year, ribbonColor, ongoing }: MedalP
 // plaque, a breathing golden halo behind it, and a specular sweep across
 // the bowl. All animation is SMIL (works on iOS).
 
-export function Trophy({ value, unit }: { value: string; unit: string }) {
+export type TrophyTier = 'bronze' | 'silver' | 'gold' | 'platinum';
+
+// 金属ごとの色: v = 上から下への陰影, h = 縁の左右の磨き, stroke = 輪郭, glow = 後光(r,g,b)
+const TROPHY_METAL: Record<TrophyTier | 'locked', { v: string[]; h: string[]; stroke: string; glow: string; engrave: string }> = {
+  bronze: { v: ['#FDE3C8', '#E7A36B', '#B8743D', '#8A5228', '#5E3517'], h: ['#7A4A22', '#F0BF8F', '#FDE3C8', '#C88550', '#5E3517'], stroke: '#4D2A10', glow: '231,163,107', engrave: 'rgba(80,40,10,0.8)' },
+  silver: { v: ['#FFFFFF', '#E3E8EE', '#B9C2CD', '#8A94A3', '#5F6977'], h: ['#6F7A88', '#DFE5EC', '#FFFFFF', '#B9C2CD', '#5F6977'], stroke: '#4A5260', glow: '200,215,235', engrave: 'rgba(50,60,75,0.8)' },
+  gold: { v: ['#FFF8DC', '#FFD54F', '#F0A500', '#C07F0C', '#8A5C08'], h: ['#9A6B0A', '#FFE082', '#FFF3C4', '#E0A81A', '#8A5C08'], stroke: '#7A4F00', glow: '255,215,64', engrave: 'rgba(110,65,0,0.8)' },
+  platinum: { v: ['#FFFFFF', '#F1EFFF', '#CFCBF7', '#A19BDB', '#6E68AD'], h: ['#6E68AD', '#E4E0FF', '#FFFFFF', '#B9B2F0', '#6E68AD'], stroke: '#4B4686', glow: '190,170,255', engrave: 'rgba(60,50,130,0.8)' },
+  locked: { v: ['#d6d6d6', '#c4c4c4', '#b0b0b0', '#9e9e9e', '#8c8c8c'], h: ['#9e9e9e', '#c4c4c4', '#d6d6d6', '#b0b0b0', '#8c8c8c'], stroke: 'rgba(0,0,0,0.25)', glow: '0,0,0', engrave: 'rgba(0,0,0,0.25)' },
+};
+
+export function Trophy({ value, unit, tier = 'gold', locked = false, size = 56 }: {
+  value: string; unit: string; tier?: TrophyTier;
+  /** まだ取っていない(灰色で、光らない) */
+  locked?: boolean;
+  /** 高さ(px) */
+  size?: number;
+}) {
   const gid = useId();
+  const m = TROPHY_METAL[locked ? 'locked' : tier];
   const valueSize = value.length >= 4 ? 9.5 : value.length === 3 ? 11 : 13;
   const BOWL = 'M14 18 H42 V27 C42 39 35.5 45 28 45 C20.5 45 14 39 14 27 Z';
 
   return (
-    <svg width={46} height={56} viewBox="0 0 56 68" aria-hidden focusable="false">
+    <svg width={size * 46 / 56} height={size} viewBox="0 0 56 68" style={locked ? { opacity: 0.45 } : undefined} aria-hidden focusable="false">
       <defs>
         {/* Polished gold: bright crown, deep amber core, dark foot */}
         <linearGradient id={`${gid}-v`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#FFF8DC" />
-          <stop offset="22%" stopColor="#FFD54F" />
-          <stop offset="55%" stopColor="#F0A500" />
-          <stop offset="82%" stopColor="#C07F0C" />
-          <stop offset="100%" stopColor="#8A5C08" />
+          <stop offset="0%" stopColor={m.v[0]} />
+          <stop offset="22%" stopColor={m.v[1]} />
+          <stop offset="55%" stopColor={m.v[2]} />
+          <stop offset="82%" stopColor={m.v[3]} />
+          <stop offset="100%" stopColor={m.v[4]} />
         </linearGradient>
         {/* Mirror-band for lip / base tiers (light-dark-light polish) */}
         <linearGradient id={`${gid}-h`} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="#9A6B0A" />
-          <stop offset="22%" stopColor="#FFE082" />
-          <stop offset="50%" stopColor="#FFF3C4" />
-          <stop offset="78%" stopColor="#E0A81A" />
-          <stop offset="100%" stopColor="#8A5C08" />
+          <stop offset="0%" stopColor={m.h[0]} />
+          <stop offset="22%" stopColor={m.h[1]} />
+          <stop offset="50%" stopColor={m.h[2]} />
+          <stop offset="78%" stopColor={m.h[3]} />
+          <stop offset="100%" stopColor={m.h[4]} />
         </linearGradient>
         {/* Halo behind the cup */}
         <radialGradient id={`${gid}-halo`} cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="rgba(255,215,64,0.8)" />
-          <stop offset="55%" stopColor="rgba(255,200,40,0.35)" />
-          <stop offset="100%" stopColor="rgba(255,200,40,0)" />
+          <stop offset="0%" stopColor={`rgba(${m.glow},0.8)`} />
+          <stop offset="55%" stopColor={`rgba(${m.glow},0.35)`} />
+          <stop offset="100%" stopColor={`rgba(${m.glow},0)`} />
         </radialGradient>
         {/* Rays fade to nothing well inside the viewBox so rotation never clips */}
         <radialGradient id={`${gid}-ray`} gradientUnits="userSpaceOnUse" cx="28" cy="32" r="26">
-          <stop offset="0%" stopColor="rgba(255,225,120,0.75)" />
-          <stop offset="50%" stopColor="rgba(255,212,85,0.4)" />
-          <stop offset="100%" stopColor="rgba(255,210,80,0)" />
+          <stop offset="0%" stopColor={`rgba(${m.glow},0.75)`} />
+          <stop offset="50%" stopColor={`rgba(${m.glow},0.4)`} />
+          <stop offset="100%" stopColor={`rgba(${m.glow},0)`} />
         </radialGradient>
         <linearGradient id={`${gid}-sw`} x1="0" y1="0" x2="1" y2="0">
           <stop offset="0%" stopColor="rgba(255,255,255,0)" />
@@ -129,6 +147,7 @@ export function Trophy({ value, unit }: { value: string; unit: string }) {
 
       {/* Soft breathing halo — the single source of the surrounding glow.
           4s cycle, spline-eased, gently swelling in size and brightness. */}
+      {!locked && <>
       <circle cx={28} cy={32} r={25} fill={`url(#${gid}-halo)`}>
         <animate
           attributeName="opacity" values="0.75;1;0.75" dur="5s"
@@ -161,6 +180,8 @@ export function Trophy({ value, unit }: { value: string; unit: string }) {
         </g>
       </g>
 
+      </>}
+
       {/* Handles: S-curves with a bright inner accent */}
       <path d="M14 20 C3.5 20 2.5 34 15 36.5" fill="none" stroke={`url(#${gid}-v)`} strokeWidth={3.6} strokeLinecap="round" />
       <path d="M42 20 C52.5 20 53.5 34 41 36.5" fill="none" stroke={`url(#${gid}-v)`} strokeWidth={3.6} strokeLinecap="round" />
@@ -168,7 +189,7 @@ export function Trophy({ value, unit }: { value: string; unit: string }) {
       <path d="M42 20 C51 20 51.5 33 41 35.5" fill="none" stroke="rgba(255,248,220,0.55)" strokeWidth={1} strokeLinecap="round" />
 
       {/* Bowl with cylindrical shading */}
-      <path d={BOWL} fill={`url(#${gid}-v)`} stroke="#7A4F00" strokeWidth={1} />
+      <path d={BOWL} fill={`url(#${gid}-v)`} stroke={m.stroke} strokeWidth={1} />
       <g clipPath={`url(#${gid}-cl)`}>
         {/* left highlight column / right shade column */}
         <path d="M17 18 h5 v27 h-5 Z" fill="rgba(255,255,255,0.32)" />
@@ -178,7 +199,7 @@ export function Trophy({ value, unit }: { value: string; unit: string }) {
       </g>
 
       {/* Lip */}
-      <rect x={11.5} y={13} width={33} height={5.5} rx={2.75} fill={`url(#${gid}-h)`} stroke="#7A4F00" strokeWidth={1} />
+      <rect x={11.5} y={13} width={33} height={5.5} rx={2.75} fill={`url(#${gid}-h)`} stroke={m.stroke} strokeWidth={1} />
 
       {/* Engraved star above the number */}
       <polygon
@@ -187,7 +208,7 @@ export function Trophy({ value, unit }: { value: string; unit: string }) {
       />
 
       {/* Value: engraved (dark offset under white face) */}
-      <text x={28} y={39.2} textAnchor="middle" fontWeight={800} fontSize={valueSize} fill="rgba(110,65,0,0.8)">
+      <text x={28} y={39.2} textAnchor="middle" fontWeight={800} fontSize={valueSize} fill={m.engrave}>
         {value}<tspan fontSize={7} fontWeight={700}>{unit}</tspan>
       </text>
       <text x={28} y={38.5} textAnchor="middle" fontWeight={800} fontSize={valueSize} fill="#FFFFFF">
@@ -195,24 +216,24 @@ export function Trophy({ value, unit }: { value: string; unit: string }) {
       </text>
 
       {/* Knopped stem */}
-      <path d="M25.5 45 h5 v2.5 h-5 Z" fill={`url(#${gid}-v)`} stroke="#7A4F00" strokeWidth={0.7} />
-      <ellipse cx={28} cy={49.8} rx={4.6} ry={2.4} fill={`url(#${gid}-v)`} stroke="#7A4F00" strokeWidth={0.7} />
-      <path d="M25.5 51.8 h5 v3 h-5 Z" fill={`url(#${gid}-v)`} stroke="#7A4F00" strokeWidth={0.7} />
+      <path d="M25.5 45 h5 v2.5 h-5 Z" fill={`url(#${gid}-v)`} stroke={m.stroke} strokeWidth={0.7} />
+      <ellipse cx={28} cy={49.8} rx={4.6} ry={2.4} fill={`url(#${gid}-v)`} stroke={m.stroke} strokeWidth={0.7} />
+      <path d="M25.5 51.8 h5 v3 h-5 Z" fill={`url(#${gid}-v)`} stroke={m.stroke} strokeWidth={0.7} />
 
       {/* Tiered base + plaque */}
-      <path d="M19 54.8 H37 L39.5 58.8 H16.5 Z" fill={`url(#${gid}-h)`} stroke="#7A4F00" strokeWidth={0.8} />
-      <rect x={13.5} y={58.8} width={29} height={6.5} rx={1.5} fill={`url(#${gid}-h)`} stroke="#7A4F00" strokeWidth={0.8} />
+      <path d="M19 54.8 H37 L39.5 58.8 H16.5 Z" fill={`url(#${gid}-h)`} stroke={m.stroke} strokeWidth={0.8} />
+      <rect x={13.5} y={58.8} width={29} height={6.5} rx={1.5} fill={`url(#${gid}-h)`} stroke={m.stroke} strokeWidth={0.8} />
       <rect x={20} y={60.3} width={16} height={3.6} rx={0.8} fill="#4E342E" stroke="#3E2723" strokeWidth={0.5} />
       <rect x={21} y={61} width={14} height={0.8} rx={0.4} fill="rgba(255,235,180,0.35)" />
 
       {/* Gentle specular sweep across the bowl (~1.3s glide, 4s cycle) */}
-      <g clipPath={`url(#${gid}-cl)`}>
+      {!locked && <g clipPath={`url(#${gid}-cl)`}>
         <g transform="skewX(-18)">
           <rect y={16} width={11} height={32} fill={`url(#${gid}-sw)`}>
             <animate attributeName="x" values="-22;76;76" keyTimes="0;0.33;1" dur="4s" repeatCount="indefinite" />
           </rect>
         </g>
-      </g>
+      </g>}
     </svg>
   );
 }

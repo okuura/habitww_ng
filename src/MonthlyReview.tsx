@@ -91,7 +91,7 @@ export default function MonthlyReviewEntry({ ctx, evaluated, goals }: Props) {
           <Box sx={{ mt: 2.5, display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 2, maxWidth: 300 }}>
             {review.badges.slice(0, 8).map(a => (
               <Box key={a.id} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, width: 64 }}>
-                <AchievementEmblem icon={a.icon} earned mark={a.mark} size={52} />
+                <AchievementEmblem badge={a} earned size={56} />
                 <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, lineHeight: 1.2 }}>{a.name}</Typography>
               </Box>
             ))}
@@ -114,7 +114,7 @@ export default function MonthlyReviewEntry({ ctx, evaluated, goals }: Props) {
         <Box sx={{ mt: 2.5, display: 'flex', flexDirection: 'column', gap: 1.25, width: '100%', maxWidth: 320 }}>
           {goals.map(g => (
             <Box key={g.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, p: 1.25, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.14)', textAlign: 'left' }}>
-              <AchievementEmblem icon={g.icon} earned size={36} />
+              <AchievementEmblem badge={g} earned size={38} />
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Typography noWrap sx={{ fontWeight: 700, fontSize: '0.85rem' }}>{g.title}</Typography>
                 {g.habit && <Typography noWrap sx={{ fontSize: '0.7rem', opacity: 0.8 }}>{g.habit.name}</Typography>}

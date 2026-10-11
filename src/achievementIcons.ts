@@ -1,4 +1,5 @@
 import type { SvgIconComponent } from '@mui/icons-material';
+import type { AchievementCategory, Tier } from './achievements';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import StyleIcon from '@mui/icons-material/Style';
@@ -48,3 +49,32 @@ export const ICONS: Record<string, { Icon: SvgIconComponent; color: string }> = 
 
 export const emblemColor = (icon: string) => (ICONS[icon] ?? ICONS.trophy).color;
 
+
+// --- 形と金属 -----------------------------------------------------------------
+
+/** カテゴリごとのバッジの形 */
+export type BadgeShape = 'shield' | 'trophy' | 'card' | 'ribbon' | 'coin' | 'hexagon' | 'rosette' | 'gem' | 'star';
+
+export const SHAPE: Record<AchievementCategory, BadgeShape> = {
+  streak: 'shield',
+  total: 'trophy',
+  rank: 'card',
+  month: 'ribbon',
+  season: 'coin',
+  perfectDay: 'hexagon',
+  onTime: 'rosette',
+  bacchiri: 'gem',
+  time: 'coin',
+  comeback: 'hexagon',
+  anniversary: 'ribbon',
+  collector: 'coin',
+  secret: 'star',
+};
+
+/** 金属の縁の色(明るい→暗い)と、刻む文字の地の色 */
+export const METAL: Record<Tier, { stops: string[]; dark: string; label: string }> = {
+  bronze: { stops: ['#fde3c8', '#d99a62', '#a8652f', '#e7b088', '#6f421d'], dark: '#5a3415', label: '#b8743d' },
+  silver: { stops: ['#ffffff', '#d5dbe3', '#9aa5b4', '#eef1f5', '#66717f'], dark: '#3f4855', label: '#8e99a8' },
+  gold: { stops: ['#fff6c8', '#f2c94c', '#c48a10', '#ffe58a', '#8a5c08'], dark: '#6b4500', label: '#d4a017' },
+  platinum: { stops: ['#ff9aa8', '#ffe08a', '#9af0c0', '#8ad8ff', '#c3a8ff', '#ff9ad9'], dark: '#4b4686', label: '#8c7cf0' },
+};

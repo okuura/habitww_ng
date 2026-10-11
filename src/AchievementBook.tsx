@@ -1,20 +1,30 @@
-import { useEffect, useMemo, useState } from 'react';
+import { forwardRef, useEffect, useMemo, useState, type ReactElement, type Ref } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Dialog from '@mui/material/Dialog';
+import Slide from '@mui/material/Slide';
+import type { TransitionProps } from '@mui/material/transitions';
 import ButtonBase from '@mui/material/ButtonBase';
 import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
 import LinearProgress from '@mui/material/LinearProgress';
 import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
-import { CATEGORY_LABEL, type AchievementCategory, type AchievementContext, type EvaluatedAchievement } from './achievements';
+import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import {
+  CATEGORY_LABEL, TIER_LABEL,
+  type AchievementCategory, type AchievementContext, type EvaluatedAchievement, type Tier,
+} from './achievements';
 import AchievementEmblem from './AchievementEmblem';
-import { emblemColor } from './achievementIcons';
+import { emblemColor, METAL } from './achievementIcons';
 import { Medal } from './Badges';
 
-// バッジ図鑑: 取ったバッジ・まだのバッジをカテゴリごとに並べる。
+// バッジ図鑑。統計ページには集めた数と最近のバッジだけを出し、
+// 全部のバッジは「すべて見る」で開く別のページ(全画面)に並べる。
 // 前回見たときから増えたバッジには NEW を付ける(見たバッジは端末に覚えておく)
 
 const SEEN_KEY = 'habitww-seen-achievements';
+const TIERS: Tier[] = ['bronze', 'silver', 'gold', 'platinum'];
 
 function readSeen(): Set<string> | null {
   try {
@@ -33,6 +43,10 @@ const shortDate = (ds: string) => {
   const [, m, d] = ds.split('-').map(Number);
   return `${m}/${d}`;
 };
+
+const SlideLeft = forwardRef(function SlideLeft(props: TransitionProps & { children: ReactElement }, ref: Ref<unknown>) {
+  return <Slide direction="left" ref={ref} {...props} />;
+});
 
 interface Props {
   ctx: AchievementContext;
@@ -57,11 +71,176 @@ export default function AchievementBook({ ctx, achievements }: Props) {
     }
   }, [earnedKey]);
 
+  // 新しいものを先に、あとは取った日の新しい順
   const recent = useMemo(
-    () => [...earned].sort((a, b) => (b.state.earnedDate ?? '').localeCompare(a.state.earnedDate ?? '')).slice(0, 3),
-    [earned],
+    () => [...earned]
+      .sort((a, b) => Number(newIds.has(b.id)) - Number(newIds.has(a.id)) || (b.state.earnedDate ?? '').localeCompare(a.state.earnedDate ?? ''))
+      .slice(0, 4),
+    [earned, newIds],
+  );
+  // まだ 1 つも無いときは、取りやすいものを見せる
+  const easiest = useMemo(
+    () => achievements
+      .filter(a => !a.state.earned && !a.hidden && a.state.target)
+      .sort((a, b) => (b.state.current ?? 0) / b.state.target! - (a.state.current ?? 0) / a.state.target!)
+      .slice(0, 4),
+    [achievements],
   );
 
+  const [pageOpen, setPageOpen] = useState(false);
+  const [selected, setSelected] = useState<EvaluatedAchievement | null>(null);
+
+  return (
+    <>
+      <Header earned={earned.length} total={achievements.length} />
+      <TierTally achievements={achievements} />
+
+      <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', display: 'block', mt: 2, mb: 1 }}>
+        {recent.length > 0 ? '最近取ったバッジ' : '最初のバッジを取りにいこう'}
+      </Typography>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1 }}>
+        {(recent.length > 0 ? recent : easiest).map(a => (
+          <BadgeCell key={a.id} a={a} isNew={newIds.has(a.id)} onClick={() => setSelected(a)} caption={a.state.earnedDate ? shortDate(a.state.earnedDate) : undefined} />
+        ))}
+      </Box>
+
+      <Button
+        fullWidth
+        onClick={() => setPageOpen(true)}
+        endIcon={<ChevronRightIcon />}
+        sx={{ mt: 2, borderRadius: 2, bgcolor: 'action.hover', color: 'text.primary', fontWeight: 700, py: 1 }}
+      >
+        すべてのバッジを見る
+        {newIds.size > 0 && (
+          <Box component="span" sx={{ ml: 1, px: 0.75, borderRadius: 1, bgcolor: 'error.main', color: '#fff', fontSize: '0.65rem', fontWeight: 800 }}>
+            NEW {newIds.size}
+          </Box>
+        )}
+      </Button>
+
+      {/* すべてのバッジ(別のページ) */}
+      <Dialog fullScreen open={pageOpen} onClose={() => setPageOpen(false)} TransitionComponent={SlideLeft}>
+        <Box
+          sx={{
+            position: 'sticky', top: 0, zIndex: 1, bgcolor: 'background.default',
+            pt: 'env(safe-area-inset-top, 0px)', borderBottom: '1px solid', borderColor: 'divider',
+          }}
+        >
+          <Box sx={{ height: 52, display: 'flex', alignItems: 'center', px: 0.5 }}>
+            <IconButton aria-label="戻る" onClick={() => setPageOpen(false)}>
+              <ArrowBackIosNewIcon fontSize="small" />
+            </IconButton>
+            <Typography sx={{ fontWeight: 800, fontSize: '1.05rem', flex: 1 }}>バッジ図鑑</Typography>
+            <Typography sx={{ fontWeight: 800, mr: 1.5 }}>
+              {earned.length}<Box component="span" sx={{ color: 'text.secondary', fontWeight: 600, fontSize: '0.75rem' }}> / {achievements.length}</Box>
+            </Typography>
+          </Box>
+        </Box>
+        <Box sx={{ bgcolor: 'background.default', flex: 1, px: 2, pt: 2, pb: 'calc(32px + env(safe-area-inset-bottom, 0px))', maxWidth: 720, width: '100%', mx: 'auto' }}>
+          <LinearProgress
+            variant="determinate"
+            value={(earned.length / achievements.length) * 100}
+            sx={{ height: 6, borderRadius: 3, bgcolor: 'action.hover', mb: 1.5, '& .MuiLinearProgress-bar': { borderRadius: 3, bgcolor: 'warning.main' } }}
+          />
+          <TierTally achievements={achievements} />
+          <AllBadges ctx={ctx} achievements={achievements} newIds={newIds} onSelect={setSelected} />
+        </Box>
+      </Dialog>
+
+      <Dialog
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        PaperProps={{ sx: { borderRadius: 4, width: 'calc(100% - 48px)', maxWidth: 340, m: 3 } }}
+      >
+        {selected && <Detail a={selected} isNew={newIds.has(selected.id)} onClose={() => setSelected(null)} />}
+      </Dialog>
+    </>
+  );
+}
+
+function Header({ earned, total }: { earned: number; total: number }) {
+  return (
+    <>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+        <WorkspacePremiumIcon sx={{ color: 'warning.main', fontSize: 20 }} />
+        <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary', flex: 1 }}>バッジ図鑑</Typography>
+        <Typography sx={{ fontWeight: 800, fontSize: '0.95rem' }}>
+          {earned}<Box component="span" sx={{ color: 'text.secondary', fontWeight: 600, fontSize: '0.75rem' }}> / {total}</Box>
+        </Typography>
+      </Box>
+      <LinearProgress
+        variant="determinate"
+        value={(earned / total) * 100}
+        sx={{ height: 6, borderRadius: 3, bgcolor: 'action.hover', mb: 1.5, '& .MuiLinearProgress-bar': { borderRadius: 3, bgcolor: 'warning.main' } }}
+      />
+    </>
+  );
+}
+
+/** 金属ごとの集めた数(銅 3/9 のように) */
+function TierTally({ achievements }: { achievements: EvaluatedAchievement[] }) {
+  return (
+    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0.75 }}>
+      {TIERS.map(t => {
+        const all = achievements.filter(a => a.tier === t);
+        const got = all.filter(a => a.state.earned).length;
+        const m = METAL[t];
+        return (
+          <Box key={t} sx={{ display: 'flex', alignItems: 'center', gap: 0.6, px: 0.75, py: 0.6, borderRadius: 1.5, bgcolor: 'action.hover', minWidth: 0 }}>
+            <Box
+              sx={{
+                width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
+                background: t === 'platinum'
+                  ? `conic-gradient(${m.stops.join(', ')}, ${m.stops[0]})`
+                  : `linear-gradient(135deg, ${m.stops.join(', ')})`,
+                border: `1px solid ${m.dark}`, opacity: got > 0 ? 1 : 0.4,
+              }}
+            />
+            <Typography noWrap sx={{ fontSize: '0.66rem', fontWeight: 700 }}>
+              {got}<Box component="span" sx={{ color: 'text.secondary', fontWeight: 500 }}>/{all.length}</Box>
+            </Typography>
+          </Box>
+        );
+      })}
+    </Box>
+  );
+}
+
+function BadgeCell({ a, isNew, onClick, caption }: { a: EvaluatedAchievement; isNew: boolean; onClick: () => void; caption?: string }) {
+  const { earned, current, target } = a.state;
+  const secret = a.hidden && !earned;
+  return (
+    <ButtonBase onClick={onClick} sx={{ flexDirection: 'column', alignItems: 'center', gap: 0.75, borderRadius: 2, py: 0.75, minWidth: 0 }}>
+      <Box sx={{ position: 'relative' }}>
+        <AchievementEmblem badge={a} earned={earned} isNew={isNew} size={58} />
+        {isNew && (
+          <Box component="span" sx={{ position: 'absolute', top: -4, right: -8, px: 0.5, borderRadius: 1, bgcolor: 'error.main', color: '#fff', fontSize: '0.55rem', fontWeight: 800, lineHeight: 1.5 }}>
+            NEW
+          </Box>
+        )}
+      </Box>
+      <Typography
+        sx={{
+          fontSize: '0.62rem', fontWeight: earned ? 700 : 500, lineHeight: 1.25, textAlign: 'center', width: '100%',
+          color: earned ? 'text.primary' : 'text.secondary',
+          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+        }}
+      >
+        {secret ? '？？？' : a.name}
+      </Typography>
+      {caption && <Typography sx={{ fontSize: '0.56rem', color: 'text.disabled', mt: -0.5 }}>{caption}</Typography>}
+      {!earned && !secret && current !== undefined && target && current > 0 && (
+        <Box sx={{ width: 40, height: 3, borderRadius: 2, bgcolor: 'action.hover', overflow: 'hidden', mt: -0.25 }}>
+          <Box sx={{ height: '100%', width: `${(current / target) * 100}%`, bgcolor: emblemColor(a.icon) }} />
+        </Box>
+      )}
+    </ButtonBase>
+  );
+}
+
+function AllBadges({ ctx, achievements, newIds, onSelect }: {
+  ctx: AchievementContext; achievements: EvaluatedAchievement[]; newIds: Set<string>; onSelect: (a: EvaluatedAchievement) => void;
+}) {
   const groups = useMemo(() => {
     const map = new Map<AchievementCategory, EvaluatedAchievement[]>();
     for (const a of achievements) {
@@ -78,105 +257,18 @@ export default function AchievementBook({ ctx, achievements }: Props) {
     [ctx],
   );
 
-  const [selected, setSelected] = useState<EvaluatedAchievement | null>(null);
-
   return (
     <>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-        <WorkspacePremiumIcon sx={{ color: 'warning.main', fontSize: 20 }} />
-        <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary', flex: 1 }}>
-          バッジ図鑑
-        </Typography>
-        <Typography sx={{ fontWeight: 800, fontSize: '0.95rem' }}>
-          {earned.length}
-          <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600, fontSize: '0.75rem' }}> / {achievements.length}</Box>
-        </Typography>
-      </Box>
-      <LinearProgress
-        variant="determinate"
-        value={(earned.length / achievements.length) * 100}
-        sx={{ height: 6, borderRadius: 3, bgcolor: 'action.hover', mb: 2, '& .MuiLinearProgress-bar': { borderRadius: 3, bgcolor: 'warning.main' } }}
-      />
-
-      {recent.length > 0 && (
-        <Box sx={{ mb: 2.5 }}>
-          <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', display: 'block', mb: 1 }}>
-            最近取ったバッジ
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            {recent.map(a => (
-              <ButtonBase
-                key={a.id}
-                onClick={() => setSelected(a)}
-                sx={{
-                  flex: 1, minWidth: 0, borderRadius: 2, px: 0.75, py: 1.25, gap: 0.75, flexDirection: 'column',
-                  bgcolor: 'action.hover', textAlign: 'center',
-                }}
-              >
-                <AchievementEmblem icon={a.icon} earned mark={a.mark} size={40} isNew={newIds.has(a.id)} />
-                <Box sx={{ minWidth: 0, maxWidth: '100%' }}>
-                  <Typography noWrap sx={{ fontSize: '0.68rem', fontWeight: 700 }}>{a.name}</Typography>
-                  <Typography noWrap sx={{ fontSize: '0.6rem', color: newIds.has(a.id) ? 'error.main' : 'text.secondary', fontWeight: newIds.has(a.id) ? 800 : 400 }}>
-                    {newIds.has(a.id) ? 'NEW!' : a.state.earnedDate ? shortDate(a.state.earnedDate) : ''}
-                  </Typography>
-                </Box>
-              </ButtonBase>
-            ))}
-          </Box>
-        </Box>
-      )}
-
       {groups.map(([category, list]) => (
-        <Box key={category} sx={{ mb: 2 }}>
+        <Box key={category} sx={{ mt: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 1 }}>
-            <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>
-              {CATEGORY_LABEL[category]}
-            </Typography>
-            <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.62rem' }}>
+            <Typography sx={{ fontWeight: 800, fontSize: '0.85rem' }}>{CATEGORY_LABEL[category]}</Typography>
+            <Typography variant="caption" sx={{ color: 'text.disabled' }}>
               {list.filter(a => a.state.earned).length}/{list.length}
             </Typography>
           </Box>
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(68px, 1fr))', gap: 1.25, rowGap: 1.75 }}>
-            {list.map(a => {
-              const { earned: got, current, target } = a.state;
-              const secret = a.hidden && !got;
-              return (
-                <ButtonBase
-                  key={a.id}
-                  onClick={() => setSelected(a)}
-                  sx={{ flexDirection: 'column', alignItems: 'center', gap: 0.75, borderRadius: 2, py: 0.5 }}
-                >
-                  <Box sx={{ position: 'relative' }}>
-                    <AchievementEmblem icon={a.icon} earned={got} hidden={a.hidden} mark={a.mark} isNew={newIds.has(a.id)} />
-                    {newIds.has(a.id) && (
-                      <Box
-                        component="span"
-                        sx={{
-                          position: 'absolute', top: -4, right: -10, px: 0.5, borderRadius: 1,
-                          bgcolor: 'error.main', color: '#fff', fontSize: '0.55rem', fontWeight: 800, lineHeight: 1.5,
-                        }}
-                      >
-                        NEW
-                      </Box>
-                    )}
-                  </Box>
-                  <Typography
-                    sx={{
-                      fontSize: '0.62rem', fontWeight: got ? 700 : 500, lineHeight: 1.25, textAlign: 'center',
-                      color: got ? 'text.primary' : 'text.secondary',
-                      display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-                    }}
-                  >
-                    {secret ? '？？？' : a.name}
-                  </Typography>
-                  {!got && !secret && current !== undefined && target && current > 0 && (
-                    <Box sx={{ width: 40, height: 3, borderRadius: 2, bgcolor: 'action.hover', overflow: 'hidden', mt: -0.25 }}>
-                      <Box sx={{ height: '100%', width: `${(current / target) * 100}%`, bgcolor: emblemColor(a.icon) }} />
-                    </Box>
-                  )}
-                </ButtonBase>
-              );
-            })}
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(76px, 1fr))', gap: 1, rowGap: 1.5 }}>
+            {list.map(a => <BadgeCell key={a.id} a={a} isNew={newIds.has(a.id)} onClick={() => onSelect(a)} />)}
           </Box>
 
           {/* 月間パーフェクトで取ったメダル(習慣ごと・月ごと) */}
@@ -191,14 +283,6 @@ export default function AchievementBook({ ctx, achievements }: Props) {
           )}
         </Box>
       ))}
-
-      <Dialog
-        open={!!selected}
-        onClose={() => setSelected(null)}
-        PaperProps={{ sx: { borderRadius: 4, width: 'calc(100% - 48px)', maxWidth: 340, m: 3 } }}
-      >
-        {selected && <Detail a={selected} isNew={newIds.has(selected.id)} onClose={() => setSelected(null)} />}
-      </Dialog>
     </>
   );
 }
@@ -206,28 +290,28 @@ export default function AchievementBook({ ctx, achievements }: Props) {
 function Detail({ a, isNew, onClose }: { a: EvaluatedAchievement; isNew: boolean; onClose: () => void }) {
   const { earned, earnedDate, current, target, habit } = a.state;
   const secret = a.hidden && !earned;
+  const m = METAL[a.tier];
   return (
     <Box sx={{ p: 3, pb: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-      <AchievementEmblem icon={a.icon} earned={earned} hidden={a.hidden} mark={a.mark} size={84} isNew={isNew} />
-      <Typography variant="caption" sx={{ mt: 2, color: 'text.secondary', fontWeight: 600 }}>
-        {CATEGORY_LABEL[a.category]}
-      </Typography>
+      <AchievementEmblem badge={a} earned={earned} size={96} isNew={isNew} />
+      <Box sx={{ mt: 2, display: 'flex', gap: 0.75, alignItems: 'center' }}>
+        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>{CATEGORY_LABEL[a.category]}</Typography>
+        <Box component="span" sx={{ px: 0.75, borderRadius: 1, fontSize: '0.62rem', fontWeight: 800, color: '#fff', bgcolor: m.label }}>
+          {TIER_LABEL[a.tier]}
+        </Box>
+      </Box>
       <Typography sx={{ fontWeight: 800, fontSize: '1.15rem' }}>{secret ? '？？？' : a.name}</Typography>
       <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary' }}>
         {secret ? 'ひみつのバッジ。取るとわかります' : a.hint}
       </Typography>
 
       {earned && earnedDate && (
-        <Typography variant="body2" sx={{ mt: 2, fontWeight: 700 }}>
-          {formatDate(earnedDate)}に獲得
-        </Typography>
+        <Typography variant="body2" sx={{ mt: 2, fontWeight: 700 }}>{formatDate(earnedDate)}に獲得</Typography>
       )}
       {!earned && !secret && current !== undefined && target && (
         <Box sx={{ mt: 2, width: '100%' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-              {habit ? habit.name : '進み具合'}
-            </Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>{habit ? habit.name : '進み具合'}</Typography>
             <Typography variant="caption" sx={{ fontWeight: 700 }}>{current} / {target}</Typography>
           </Box>
           <LinearProgress

@@ -31,7 +31,7 @@ export default function NearGoals({ goals }: { goals: NearGoal[] }) {
                 border: '1px solid', borderColor: g.today ? alpha(color, 0.45) : 'transparent',
               }}
             >
-              <AchievementEmblem icon={g.icon} earned size={38} />
+              <AchievementEmblem badge={g} earned size={40} />
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Typography noWrap sx={{ fontSize: '0.82rem', fontWeight: 700 }}>{g.title}</Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>

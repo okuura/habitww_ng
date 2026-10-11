@@ -130,6 +130,10 @@ export function buildContext(habits: Habit[], completions: HabitCompletion[], no
 
 // --- バッジの定義 ---------------------------------------------------------------
 
+export type Tier = 'bronze' | 'silver' | 'gold' | 'platinum';
+
+export const TIER_LABEL: Record<Tier, string> = { bronze: 'ブロンズ', silver: 'シルバー', gold: 'ゴールド', platinum: 'プラチナ' };
+
 export interface AchievementState {
   earned: boolean;
   /** 条件を満たした日(YYYY-MM-DD) */
@@ -173,6 +177,8 @@ export interface Achievement {
   icon: string;
   /** バッジに刻む短い文字(例: 7日) */
   mark?: string;
+  /** 難しさ。バッジの金属が変わる(銅→銀→金→プラチナ) */
+  tier: Tier;
   evaluate: (ctx: AchievementContext) => AchievementState;
 }
 
@@ -188,8 +194,8 @@ const best = (ctx: AchievementContext, score: (h: HabitData) => number) =>
 
 const earliest = (dates: (string | undefined)[]) => dates.filter((d): d is string => !!d).sort()[0];
 
-const streak = (n: number, name: string): Achievement => ({
-  id: `streak-${n}`, category: 'streak', name, icon: 'fire', mark: `${n}日`,
+const streak = (n: number, name: string, tier: Tier): Achievement => ({
+  id: `streak-${n}`, category: 'streak', name, tier, icon: 'fire', mark: `${n}日`,
   hint: `どれかの習慣を${n}日連続で実施する`,
   evaluate: ctx => {
     const date = earliest(ctx.habits.flatMap(h => h.runs.filter(r => r.len >= n).map(r => addDays(r.start, n - 1))));
@@ -198,33 +204,33 @@ const streak = (n: number, name: string): Achievement => ({
   },
 });
 
-const total = (n: number, name: string): Achievement => ({
-  id: `total-${n}`, category: 'total', name, icon: 'trophy', mark: `${n}`,
+const total = (n: number, name: string, tier: Tier): Achievement => ({
+  id: `total-${n}`, category: 'total', name, tier, icon: 'trophy', mark: `${n}`,
   hint: `すべての習慣をあわせて${n}回実施する`,
   evaluate: ctx => counted(ctx.allCompletionDates, n),
 });
 
-const rank = (rarity: 'bronze' | 'silver' | 'gold' | 'holo', name: string): Achievement => {
-  const tier = RARITY_TIERS.find(t => t.rarity === rarity)!;
+const rank = (rarity: 'bronze' | 'silver' | 'gold' | 'holo', name: string, tier: Tier): Achievement => {
+  const card = RARITY_TIERS.find(t => t.rarity === rarity)!;
   return {
-    id: `rank-${rarity}`, category: 'rank', name, icon: `rank-${rarity}`,
-    hint: `どれかの習慣を累計${tier.min}日実施して、カードを${tier.label}にする`,
+    id: `rank-${rarity}`, category: 'rank', name, tier, icon: `rank-${rarity}`,
+    hint: `どれかの習慣を累計${card.min}日実施して、カードを${card.label}にする`,
     evaluate: ctx => {
-      const date = earliest(ctx.habits.map(h => nth(h.dates, tier.min)));
+      const date = earliest(ctx.habits.map(h => nth(h.dates, card.min)));
       const top = best(ctx, h => h.dates.length);
-      return { earned: !!date, earnedDate: date, current: Math.min(top?.dates.length ?? 0, tier.min), target: tier.min, habit: top?.habit };
+      return { earned: !!date, earnedDate: date, current: Math.min(top?.dates.length ?? 0, card.min), target: card.min, habit: top?.habit };
     },
   };
 };
 
-const months = (n: number, name: string): Achievement => ({
-  id: `month-${n}`, category: 'month', name, icon: 'calendar', mark: `${n}`,
+const months = (n: number, name: string, tier: Tier): Achievement => ({
+  id: `month-${n}`, category: 'month', name, tier, icon: 'calendar', mark: `${n}`,
   hint: n === 1 ? 'どれかの習慣を、ある月の1日から末日まで毎日実施する' : `月間パーフェクトを${n}回取る(習慣ごとに数える)`,
   evaluate: ctx => counted(ctx.perfectMonthEnds.map(m => m.date), n),
 });
 
 const season = (id: string, name: string, icon: string, monthsIn: number[], label: string): Achievement => ({
-  id: `season-${id}`, category: 'season', name, icon,
+  id: `season-${id}`, category: 'season', name, icon, tier: 'gold',
   hint: `${label}(${monthsIn.join('・')}月)に月間パーフェクトを取る`,
   evaluate: ctx => {
     const hit = ctx.perfectMonthEnds.find(m => monthsIn.includes(m.month));
@@ -232,31 +238,31 @@ const season = (id: string, name: string, icon: string, monthsIn: number[], labe
   },
 });
 
-const perfectDay = (n: number, name: string): Achievement => ({
-  id: `perfect-day-${n}`, category: 'perfectDay', name, icon: 'check', mark: n > 1 ? `${n}` : undefined,
+const perfectDay = (n: number, name: string, tier: Tier): Achievement => ({
+  id: `perfect-day-${n}`, category: 'perfectDay', name, tier, icon: 'check', mark: n > 1 ? `${n}` : undefined,
   hint: n === 1 ? 'その日にある習慣を全部実施する' : `その日にある習慣を全部実施した日を${n}日つくる`,
   evaluate: ctx => counted(ctx.perfectDays, n),
 });
 
-const onTime = (n: number, name: string): Achievement => ({
-  id: `on-time-${n}`, category: 'onTime', name, icon: 'bolt', mark: `${n}`,
+const onTime = (n: number, name: string, tier: Tier): Achievement => ({
+  id: `on-time-${n}`, category: 'onTime', name, tier, icon: 'bolt', mark: `${n}`,
   hint: `実施時間から10分以内の実施(疾風迅雷)を${n}回する`,
   evaluate: ctx => counted(ctx.onTimeDates, n),
 });
 
-const bacchiri = (n: number, name: string): Achievement => ({
-  id: `bacchiri-${n}`, category: 'bacchiri', name, icon: 'sparkle', mark: `${n}`,
+const bacchiri = (n: number, name: string, tier: Tier): Achievement => ({
+  id: `bacchiri-${n}`, category: 'bacchiri', name, tier, icon: 'sparkle', mark: `${n}`,
   hint: `「ばっちり達成」を${n}回する`,
   evaluate: ctx => counted(ctx.bacchiriDates, n),
 });
 
-const timeOfDay = (id: string, name: string, icon: string, hint: string, n: number, match: (h: number, m: number) => boolean, hidden = false): Achievement => ({
-  id: `time-${id}`, category: hidden ? 'secret' : 'time', name, icon, hint, hidden, mark: n > 1 ? `${n}` : undefined,
+const timeOfDay = (id: string, name: string, icon: string, hint: string, n: number, match: (h: number, m: number) => boolean, tier: Tier, hidden = false): Achievement => ({
+  id: `time-${id}`, category: hidden ? 'secret' : 'time', name, icon, hint, hidden, tier, mark: n > 1 ? `${n}` : undefined,
   evaluate: ctx => counted(ctx.timed.filter(t => match(t.hour, t.minute)).map(t => t.date), n),
 });
 
-const anniversary = (n: number, name: string): Achievement => ({
-  id: `anniversary-${n}`, category: 'anniversary', name, icon: 'cake', mark: n === 365 ? '1年' : `${n}日`,
+const anniversary = (n: number, name: string, tier: Tier): Achievement => ({
+  id: `anniversary-${n}`, category: 'anniversary', name, tier, icon: 'cake', mark: n === 365 ? '1年' : `${n}日`,
   hint: n === 365 ? '習慣を始めてから1年たつ' : `習慣を始めてから${n}日たつ`,
   evaluate: ctx => {
     const oldest = ctx.habits.map(h => toLocalDateString(new Date(h.habit.created_at))).sort()[0];
@@ -266,14 +272,14 @@ const anniversary = (n: number, name: string): Achievement => ({
   },
 });
 
-const collector = (n: number, name: string): Achievement => ({
-  id: `collector-${n}`, category: 'collector', name, icon: 'collection', mark: `${n}`,
+const collector = (n: number, name: string, tier: Tier): Achievement => ({
+  id: `collector-${n}`, category: 'collector', name, tier, icon: 'collection', mark: `${n}`,
   hint: `習慣を${n}つ持つ`,
   evaluate: ctx => counted(ctx.habits.map(h => toLocalDateString(new Date(h.habit.created_at))).sort(), n),
 });
 
 const onDate = (id: string, name: string, icon: string, hint: string, mmdd: string): Achievement => ({
-  id, category: 'secret', name, icon, hint, hidden: true,
+  id, category: 'secret', name, icon, hint, hidden: true, tier: 'silver',
   evaluate: ctx => {
     const date = ctx.allCompletionDates.find(d => d.endsWith(mmdd));
     return { earned: !!date, earnedDate: date };
@@ -281,56 +287,56 @@ const onDate = (id: string, name: string, icon: string, hint: string, mmdd: stri
 });
 
 export const ACHIEVEMENTS: Achievement[] = [
-  streak(3, '三日坊主卒業'),
-  streak(7, '一週間'),
-  streak(21, '習慣の芽'),
-  streak(30, 'ひと月皆勤'),
-  streak(66, '習慣化'),
-  streak(100, '百日行'),
-  streak(365, '一年皆勤'),
+  streak(3, '三日坊主卒業', 'bronze'),
+  streak(7, '一週間', 'bronze'),
+  streak(21, '習慣の芽', 'silver'),
+  streak(30, 'ひと月皆勤', 'silver'),
+  streak(66, '習慣化', 'gold'),
+  streak(100, '百日行', 'gold'),
+  streak(365, '一年皆勤', 'platinum'),
 
-  total(10, 'はじめの一歩'),
-  total(50, '積み上げ'),
-  total(100, '百回達成'),
-  total(250, '継続は力'),
-  total(500, '五百の足跡'),
-  total(1000, '千里の道'),
+  total(10, 'はじめの一歩', 'bronze'),
+  total(50, '積み上げ', 'bronze'),
+  total(100, '百回達成', 'silver'),
+  total(250, '継続は力', 'silver'),
+  total(500, '五百の足跡', 'gold'),
+  total(1000, '千里の道', 'platinum'),
 
-  rank('bronze', 'ブロンズカード'),
-  rank('silver', 'シルバーカード'),
-  rank('gold', 'ゴールドカード'),
-  rank('holo', 'ホロカード'),
+  rank('bronze', 'ブロンズカード', 'bronze'),
+  rank('silver', 'シルバーカード', 'silver'),
+  rank('gold', 'ゴールドカード', 'gold'),
+  rank('holo', 'ホロカード', 'platinum'),
 
-  months(1, '完璧な一か月'),
-  months(3, '三つのメダル'),
-  months(12, 'メダル十二枚'),
+  months(1, '完璧な一か月', 'silver'),
+  months(3, '三つのメダル', 'gold'),
+  months(12, 'メダル十二枚', 'platinum'),
 
   season('spring', '春の皆勤', 'spring', [3, 4, 5], '春'),
   season('summer', '夏の皆勤', 'summer', [6, 7, 8], '夏'),
   season('autumn', '秋の皆勤', 'autumn', [9, 10, 11], '秋'),
   season('winter', '冬の皆勤', 'winter', [12, 1, 2], '冬'),
 
-  perfectDay(1, 'パーフェクトデイ'),
-  perfectDay(10, '完璧な十日'),
-  perfectDay(50, '完璧な五十日'),
+  perfectDay(1, 'パーフェクトデイ', 'bronze'),
+  perfectDay(10, '完璧な十日', 'silver'),
+  perfectDay(50, '完璧な五十日', 'gold'),
 
-  onTime(10, '疾風'),
-  onTime(50, '迅雷'),
-  onTime(100, '疾風迅雷'),
+  onTime(10, '疾風', 'bronze'),
+  onTime(50, '迅雷', 'silver'),
+  onTime(100, '疾風迅雷', 'gold'),
 
-  bacchiri(10, 'ばっちり'),
-  bacchiri(50, 'ばっちりの達人'),
+  bacchiri(10, 'ばっちり', 'bronze'),
+  bacchiri(50, 'ばっちりの達人', 'silver'),
   {
-    id: 'bacchiri-streak-7', category: 'bacchiri', name: 'ばっちり一週間', icon: 'sparkle', mark: '7日',
+    id: 'bacchiri-streak-7', category: 'bacchiri', name: 'ばっちり一週間', icon: 'sparkle', mark: '7日', tier: 'gold',
     hint: 'どれかの習慣で「ばっちり達成」を7日続ける',
     evaluate: ctx => bacchiriStreak(ctx, 7),
   },
 
-  timeOfDay('early', '早起き', 'sunrise', '4時〜6時前に10回実施する', 10, h => h >= 4 && h < 6),
-  timeOfDay('night', '夜ふかし', 'moon', '23時〜翌3時前に10回実施する', 10, h => h === 23 || h < 3),
+  timeOfDay('early', '早起き', 'sunrise', '4時〜6時前に10回実施する', 10, h => h >= 4 && h < 6, 'silver'),
+  timeOfDay('night', '夜ふかし', 'moon', '23時〜翌3時前に10回実施する', 10, h => h === 23 || h < 3, 'silver'),
 
   {
-    id: 'comeback', category: 'comeback', name: '復活', icon: 'comeback',
+    id: 'comeback', category: 'comeback', name: '復活', icon: 'comeback', tier: 'silver',
     hint: '3日以上あいたあとに再開して、そこから7日続ける',
     evaluate: ctx => {
       const dates = ctx.habits.flatMap(h => h.runs
@@ -351,7 +357,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     },
   },
   {
-    id: 'weekend', category: 'comeback', name: '週末も休まない', icon: 'weekend', mark: '4',
+    id: 'weekend', category: 'comeback', name: '週末も休まない', icon: 'weekend', mark: '4', tier: 'bronze',
     hint: '土曜と日曜の両方に実施した週末を4回つくる',
     evaluate: ctx => {
       const sundays = new Set<string>();
@@ -364,14 +370,14 @@ export const ACHIEVEMENTS: Achievement[] = [
     },
   },
 
-  anniversary(100, '百日記念'),
-  anniversary(365, '一周年'),
+  anniversary(100, '百日記念', 'silver'),
+  anniversary(365, '一周年', 'gold'),
 
-  collector(3, '三つの習慣'),
-  collector(5, '五つの習慣'),
+  collector(3, '三つの習慣', 'bronze'),
+  collector(5, '五つの習慣', 'silver'),
 
-  timeOfDay('zorome', 'ゾロ目', 'clock', '11:11 か 22:22 ちょうどに実施する', 1, (h, m) => (h === 11 && m === 11) || (h === 22 && m === 22), true),
-  timeOfDay('midnight', '日付が変わる瞬間', 'clock', '0:00 ちょうどに実施する', 1, (h, m) => h === 0 && m === 0, true),
+  timeOfDay('zorome', 'ゾロ目', 'clock', '11:11 か 22:22 ちょうどに実施する', 1, (h, m) => (h === 11 && m === 11) || (h === 22 && m === 22), 'gold', true),
+  timeOfDay('midnight', '日付が変わる瞬間', 'clock', '0:00 ちょうどに実施する', 1, (h, m) => h === 0 && m === 0, 'gold', true),
   onDate('new-year', '元日', 'party', '1月1日に実施する', '-01-01'),
   onDate('new-years-eve', '大晦日', 'moon', '12月31日に実施する', '-12-31'),
 ];
@@ -412,10 +418,15 @@ export interface NearGoal {
   unit: string;
   progress: number;
   icon: string;
+  category: AchievementCategory;
+  tier: Tier;
+  mark?: string;
   habit?: Habit;
   /** 今日実施すれば届く */
   today: boolean;
 }
+
+const RANK_TIER: Record<string, Tier> = { bronze: 'bronze', silver: 'silver', gold: 'gold', holo: 'platinum' };
 
 /** 今日の実施で 1 つ進むバッジ(時間がたつだけで進むものは除く) */
 const DAILY: AchievementCategory[] = ['streak', 'total', 'perfectDay', 'comeback', 'rank'];
@@ -439,7 +450,7 @@ export function nearGoals(ctx: AchievementContext, evaluated: EvaluatedAchieveme
     goals.push({
       id: a.id, title: `「${a.name}」バッジ`, remaining: left,
       unit: DAY_UNIT.includes(a.category) ? '日' : '回',
-      progress: current / target, icon: a.icon, habit, today: helpsToday,
+      progress: current / target, icon: a.icon, category: a.category, tier: a.tier, mark: a.mark, habit, today: helpsToday,
     });
   }
 
@@ -448,14 +459,16 @@ export function nearGoals(ctx: AchievementContext, evaluated: EvaluatedAchieveme
     if (r.next && r.daysToNext !== null && r.daysToNext <= 5) {
       goals.push({
         id: `rank-${h.habit.id}`, title: `${r.next.label}カード`, remaining: r.daysToNext, unit: '日',
-        progress: r.progress, icon: `rank-${r.next.rarity}`, habit: h.habit, today: r.daysToNext === 1 && !h.doneToday,
+        progress: r.progress, icon: `rank-${r.next.rarity}`, category: 'rank', tier: RANK_TIER[r.next.rarity],
+        habit: h.habit, today: r.daysToNext === 1 && !h.doneToday,
       });
     }
     if (h.ongoingDaysLeft !== null && h.ongoingDaysLeft <= 10) {
       const monthDays = new Date(ctx.today.getFullYear(), ctx.today.getMonth() + 1, 0).getDate();
       goals.push({
         id: `month-${h.habit.id}`, title: `${ctx.today.getMonth() + 1}月のパーフェクト`, remaining: h.ongoingDaysLeft, unit: '日',
-        progress: 1 - h.ongoingDaysLeft / monthDays, icon: 'calendar', habit: h.habit, today: h.ongoingDaysLeft === 1 && !h.doneToday,
+        progress: 1 - h.ongoingDaysLeft / monthDays, icon: 'calendar', category: 'month', tier: 'silver', mark: `${ctx.today.getMonth() + 1}月`,
+        habit: h.habit, today: h.ongoingDaysLeft === 1 && !h.doneToday,
       });
     }
   }
