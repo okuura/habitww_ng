@@ -141,3 +141,61 @@ export function timeRange(values: number[]): { from: number; to: number; step: n
   const step = span <= 6 ? 60 : span <= 12 ? 120 : 240;
   return { from, to, step };
 }
+
+// --- 一日のリズム(全習慣をまとめた、時刻の分布) -----------------------------------------
+
+export interface RhythmCell {
+  /** 時台(4,5,…,23,0,1,2,3) */
+  hour: number;
+  count: number;
+  /** その時間に一番多い習慣の色(0 回なら null) */
+  color: string | null;
+}
+
+export interface DayRhythm {
+  /** 全記録数 */
+  total: number;
+  /** 4 時はじまりの 24 マス */
+  cells: RhythmCell[];
+  /** 連続 2 時間で記録が一番多い区間の始まりの時台(例 21 → 21〜23時)と、全記録に対する割合 */
+  golden: { hour: number; share: number } | null;
+  /** 朝(4〜11 時台)・昼(12〜17)・夜(18〜3)の割合と、型 */
+  shares: { morning: number; noon: number; night: number };
+  type: 'morning' | 'noon' | 'night' | 'even';
+  /** 休日(土日)の平均時刻 − 平日の平均時刻(分。どちらも 5 回未満なら null) */
+  weekendShift: number | null;
+}
+
+export function dayRhythm(ctx: AchievementContext): DayRhythm {
+  const colorOf = new Map(ctx.habits.map(h => [h.habit.id, h.habit.color]));
+  const hours = Array.from({ length: 24 }, (_, i) => (i + 4) % 24);
+  const byHour = hours.map(hour => ({ hour, count: 0, perHabit: new Map<string, number>() }));
+  for (const t of ctx.timed) {
+    const cell = byHour[(t.hour - 4 + 24) % 24];
+    cell.count++;
+    cell.perHabit.set(t.habitId, (cell.perHabit.get(t.habitId) ?? 0) + 1);
+  }
+  const cells: RhythmCell[] = byHour.map(c => {
+    const top = [...c.perHabit].sort((a, b) => b[1] - a[1])[0];
+    return { hour: c.hour, count: c.count, color: top ? colorOf.get(top[0]) ?? null : null };
+  });
+  const total = ctx.timed.length;
+
+  let golden: DayRhythm['golden'] = null;
+  for (let i = 0; i < 23; i++) {
+    const n = cells[i].count + cells[i + 1].count;
+    if (n > 0 && (!golden || n > golden.share * total)) golden = { hour: cells[i].hour, share: n / total };
+  }
+
+  const slot = (h: number) => (h >= 4 && h < 12 ? 'morning' : h >= 12 && h < 18 ? 'noon' : 'night');
+  const n = { morning: 0, noon: 0, night: 0 };
+  for (const t of ctx.timed) n[slot(t.hour)]++;
+  const shares = { morning: total ? n.morning / total : 0, noon: total ? n.noon / total : 0, night: total ? n.night / total : 0 };
+  const type: DayRhythm['type'] = shares.morning >= 0.5 ? 'morning' : shares.noon >= 0.5 ? 'noon' : shares.night >= 0.5 ? 'night' : 'even';
+
+  const weekday = ctx.timed.filter(t => { const w = weekdayOf(t.date); return w >= 1 && w <= 5; }).map(minutesOf);
+  const weekend = ctx.timed.filter(t => { const w = weekdayOf(t.date); return w === 0 || w === 6; }).map(minutesOf);
+  const weekendShift = weekday.length >= 5 && weekend.length >= 5 ? Math.round(avg(weekend) - avg(weekday)) : null;
+
+  return { total, cells, golden, shares, type, weekendShift };
+}

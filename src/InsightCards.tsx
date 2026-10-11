@@ -37,11 +37,6 @@ export default function InsightCards({ insights }: { insights: Insight[] }) {
         <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary', flex: 1 }}>
           今日の気づき
         </Typography>
-        {insights.length > 1 && (
-          <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.62rem' }}>
-            横にスワイプ →
-          </Typography>
-        )}
       </Box>
       <Box
         sx={{
