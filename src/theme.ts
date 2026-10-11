@@ -42,6 +42,17 @@ const theme = createTheme({
   shape: {
     borderRadius: 12,
   },
+  components: {
+    // 下のタブ: 選んだタブの文字を大きくしない(色だけで示す)
+    MuiBottomNavigationAction: {
+      styleOverrides: {
+        label: {
+          fontSize: '0.75rem',
+          '&.Mui-selected': { fontSize: '0.75rem' },
+        },
+      },
+    },
+  },
 });
 
 export default theme;

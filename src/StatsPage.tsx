@@ -9,7 +9,6 @@ import { alpha, useTheme } from '@mui/material/styles';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import type { Habit, HabitCompletion } from './supabase';
-import AchievementDots from './AchievementDots';
 import InsightCards from './InsightCards';
 import { pickInsights } from './insights';
 import { HabitComparison, PersonalBestTiles } from './PersonalRecords';
@@ -110,16 +109,6 @@ export default function StatsPage({ habits, completions }: StatsPageProps) {
       >
         <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
           <HabitComparison habits={habits} completions={completions} />
-        </CardContent>
-      </Card>
-
-      {/* Total effort — dot visualisation (overflow visible so the party spills out) */}
-      <Card
-        elevation={0}
-        sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2, overflow: 'visible' }}
-      >
-        <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-          <AchievementDots habits={habits} completions={completions} />
         </CardContent>
       </Card>
 

@@ -7,10 +7,11 @@ import CardContent from '@mui/material/CardContent';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import type { Habit, HabitCompletion } from './supabase';
 import AchievementBook from './AchievementBook';
+import AchievementDots from './AchievementDots';
 import NearGoals from './NearGoals';
 import { buildContext, evaluateAll, nearGoals } from './achievements';
 
-// 実績ページ: もうすぐ取れるバッジと、バッジ図鑑
+// 実績ページ: これまでの実績(ドット)、もうすぐ取れるバッジ、バッジ図鑑
 
 interface AchievementsPageProps {
   habits: Habit[];
@@ -39,6 +40,16 @@ export default function AchievementsPage({ habits, completions }: AchievementsPa
 
   return (
     <Container maxWidth="md" sx={{ py: { xs: 1.5, sm: 3 }, px: { xs: 1.5, sm: 3 } }}>
+      {/* これまでの実績(overflow visible: お祝いの演出がカードの外にはみ出せるように) */}
+      <Card
+        elevation={0}
+        sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2, overflow: 'visible' }}
+      >
+        <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+          <AchievementDots habits={habits} completions={completions} />
+        </CardContent>
+      </Card>
+
       {achievements.goals.length > 0 && (
         <Card
           elevation={0}

@@ -339,7 +339,7 @@ export default function AchievementDots({ habits, completions }: AchievementDots
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
         <EmojiEventsIcon sx={{ color: 'warning.main', fontSize: 20 }} />
         <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
-          これまでの積み上げ
+          これまでの実績
         </Typography>
         {/* Party switch: the dancing man starts / stops the cheer popups */}
         <Box
