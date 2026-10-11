@@ -1,7 +1,8 @@
-import { useMemo, useRef, useEffect, useState } from 'react';
+import { useMemo, useRef, useEffect, useState, type RefObject } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import GlobalStyles from '@mui/material/GlobalStyles';
+import Portal from '@mui/material/Portal';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import { keyframes } from '@emotion/react';
 import type { Habit, HabitCompletion } from './supabase';
@@ -149,9 +150,35 @@ interface Cheer {
 }
 
 // Words of praise and party emoji popping up at random spots, for as long
-// as the card is on screen.
-function CheerPopups() {
+// as the card is on screen. Drawn in a layer on <body> above the app bar, so
+// whatever spills over the top of the card shows over the header too.
+function CheerPopups({ anchorRef }: { anchorRef: RefObject<HTMLDivElement | null> }) {
   const [items, setItems] = useState<Cheer[]>([]);
+  const [rect, setRect] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
+
+  // Keep the layer over the card while the page scrolls or resizes
+  useEffect(() => {
+    const el = anchorRef.current;
+    if (!el) return;
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      const r = el.getBoundingClientRect();
+      setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
+    };
+    const schedule = () => { if (!frame) frame = requestAnimationFrame(measure); };
+    measure();
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    const ro = new ResizeObserver(schedule);
+    ro.observe(el);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+      ro.disconnect();
+    };
+  }, [anchorRef]);
 
   useEffect(() => {
     let nextId = 0;
@@ -192,8 +219,12 @@ function CheerPopups() {
     return () => { opening.forEach(clearTimeout); clearInterval(timer); };
   }, []);
 
+  if (!rect) return null;
   return (
-    <Box sx={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'visible', zIndex: 5 }}>
+    <Portal>
+      {/* Above the app bar and bottom tabs (1100), below dialogs (1300) */}
+      <Box sx={{ position: 'fixed', inset: 0, pointerEvents: 'none', overflow: 'hidden', zIndex: 1150 }}>
+        <Box sx={{ position: 'absolute', top: rect.top, left: rect.left, width: rect.width, height: rect.height }}>
       {items.map(it => (
         <Box
           key={it.id}
@@ -222,7 +253,9 @@ function CheerPopups() {
           {it.text}
         </Box>
       ))}
-    </Box>
+        </Box>
+      </Box>
+    </Portal>
   );
 }
 
@@ -231,6 +264,7 @@ export default function AchievementDots({ habits, completions }: AchievementDots
   const gridRef = useRef<HTMLDivElement>(null);
   const [cols, setCols] = useState(40);
   const [party, setParty] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
 
   // Dots per row, so each row can carry the same left→right rainbow
   useEffect(() => {
@@ -315,7 +349,7 @@ export default function AchievementDots({ habits, completions }: AchievementDots
     : { fontWeight: 800, color: 'primary.main', lineHeight: 1.1 } as const;
 
   return (
-    <Box sx={{ position: 'relative' }}>
+    <Box ref={wrapRef} sx={{ position: 'relative' }}>
       <GlobalStyles styles={{
         '@keyframes achieveDotIn': {
           from: { opacity: 0, transform: 'scale(0.3)' },
@@ -334,7 +368,7 @@ export default function AchievementDots({ habits, completions }: AchievementDots
         },
       }} />
 
-      {party && <CheerPopups />}
+      {party && <CheerPopups anchorRef={wrapRef} />}
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
         <EmojiEventsIcon sx={{ color: 'warning.main', fontSize: 20 }} />
