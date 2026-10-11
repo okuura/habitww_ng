@@ -182,7 +182,7 @@ function Legend({ swatch, label }: { swatch: ReactNode; label: string }) {
 
 function Trend({ p }: { p: HabitTimeProfile }) {
   if (!p.trend) return null;
-  const d = p.trend.diff;
+  const { diff: d, days } = p.trend;
   const flat = Math.abs(d) < 10;
   const Icon = flat ? TrendingFlatIcon : d > 0 ? TrendingUpIcon : TrendingDownIcon;
   const tone = flat ? 'text.secondary' : 'primary.main';
@@ -191,8 +191,8 @@ function Trend({ p }: { p: HabitTimeProfile }) {
       <Icon sx={{ fontSize: 16, color: tone }} />
       <Typography sx={{ fontSize: '0.78rem' }}>
         {flat
-          ? <>最近 30 日は、その前の 30 日と<b>ほぼ同じ</b>時刻</>
-          : <>最近 30 日は、その前の 30 日より <Box component="b" sx={{ color: tone }}>{Math.abs(d)}分{d > 0 ? '遅め' : '早め'}</Box></>}
+          ? <>最近 {days} 日は、その前の {days} 日と<b>ほぼ同じ</b>時刻</>
+          : <>最近 {days} 日は、その前の {days} 日より <Box component="b" sx={{ color: tone }}>{Math.abs(d)}分{d > 0 ? '遅め' : '早め'}</Box></>}
       </Typography>
     </Box>
   );

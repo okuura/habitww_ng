@@ -41,8 +41,8 @@ export interface HabitTimeProfile {
   /** 一番早い・遅い曜日(差が 15 分以上のときだけ) */
   earliest: { day: number; mean: number } | null;
   latest: { day: number; mean: number } | null;
-  /** 直近 30 日と、その前の 30 日の平均の差(分。曜日の差をならした値。どちらも 5 回以上のときだけ) */
-  trend: { diff: number } | null;
+  /** 直近 days 日と、その前の days 日の平均の差(分。曜日の差をならした値。どちらも 5 回以上のときだけ。すべての期間では出さない) */
+  trend: { diff: number; days: number } | null;
   /** 直近 12 週の週ごとの平均(曜日の差をならした値) */
   weekly: WeeklyPoint[];
   /** 予定の時刻 */
@@ -66,8 +66,8 @@ export function timedHabitIds(ctx: AchievementContext, min = 3): Set<string> {
 /** days: 曜日ごとの集計に使う日数(null ならすべて) */
 export function habitTimeProfiles(ctx: AchievementContext, days: number | null): HabitTimeProfile[] {
   const from = days === null ? '' : addDays(ctx.todayStr, -(days - 1));
-  const recentFrom = addDays(ctx.todayStr, -29);
-  const prevFrom = addDays(ctx.todayStr, -59);
+  const recentFrom = days === null ? '' : addDays(ctx.todayStr, -(days - 1));
+  const prevFrom = days === null ? '' : addDays(ctx.todayStr, -(days * 2 - 1));
   const thisMonday = mondayOf(ctx.todayStr);
   const weeks = Array.from({ length: 12 }, (_, i) => addDays(thisMonday, -7 * (11 - i)));
 
@@ -95,7 +95,7 @@ export function habitTimeProfiles(ctx: AchievementContext, days: number | null):
 
     const recent = adjusted.filter(t => t.date >= recentFrom).map(t => t.m);
     const prev = adjusted.filter(t => t.date >= prevFrom && t.date < recentFrom).map(t => t.m);
-    const trend = recent.length >= 5 && prev.length >= 5 ? { diff: Math.round(avg(recent) - avg(prev)) } : null;
+    const trend = days !== null && recent.length >= 5 && prev.length >= 5 ? { diff: Math.round(avg(recent) - avg(prev)), days } : null;
 
     const weekly = weeks.map(week => {
       const end = addDays(week, 7);
