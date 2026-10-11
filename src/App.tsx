@@ -37,6 +37,7 @@ import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import BarChartIcon from '@mui/icons-material/BarChart';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import PersonOffIcon from '@mui/icons-material/PersonOff';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
@@ -89,6 +90,7 @@ import { rarityOf } from './habitStats';
 import LoginPage from './LoginPage';
 
 const StatsPage = lazy(() => import('./StatsPage'));
+const AchievementsPage = lazy(() => import('./AchievementsPage'));
 const ShareModal = lazy(() => import('./ShareModal'));
 const HabitTimeDialog = lazy(() => import('./HabitTimeDialog'));
 const QRScannerDialog = lazy(() => import('./QRScannerDialog'));
@@ -529,7 +531,7 @@ function AppContent() {
   const [deleteAccountDialogOpen, setDeleteAccountDialogOpen] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deleteHabitTarget, setDeleteHabitTarget] = useState<string | null>(null);
-  const [page, setPage] = useState<'habits' | 'stats' | 'share'>('habits');
+  const [page, setPage] = useState<'habits' | 'stats' | 'achievements' | 'share'>('habits');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editingHabitId, setEditingHabitId] = useState<string | null>(null);
   const [editingHabitName, setEditingHabitName] = useState('');
@@ -1064,7 +1066,7 @@ function AppContent() {
                 color: darkMode ? '#fff' : 'primary.main',
               }}
             >
-              {page === 'habits' ? 'Habitww' : page === 'stats' ? 'Habits Insight' : 'Share Habits'}
+              {page === 'habits' ? 'Habitww' : page === 'stats' ? 'Habits Insight' : page === 'achievements' ? 'Achievements' : 'Share Habits'}
             </Typography>
           </Box>
           {!loading && habits.length > 0 && page === 'habits' && (
@@ -1436,6 +1438,12 @@ function AppContent() {
           </Suspense>
         )}
 
+        {page === 'achievements' && (
+          <Suspense fallback={<StatsPageSkeleton />}>
+            <AchievementsPage habits={habits} completions={completions} />
+          </Suspense>
+        )}
+
         {page === 'share' && user && (
           <Suspense fallback={<SharePageSkeleton />}>
             <ShareHabitsPage user={user} onScanQR={() => setScannerOpen(true)} />
@@ -1539,7 +1547,8 @@ function AppContent() {
       <Paper sx={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 'appBar' }} elevation={3}>
         <BottomNavigation showLabels value={page} onChange={(_e, v) => setPage(v)}>
           <BottomNavigationAction label="記録" value="habits" icon={<CheckBoxIcon />} />
-          <BottomNavigationAction label="統計" value="stats" icon={<BarChartIcon />} />
+          <BottomNavigationAction label="データ" value="stats" icon={<BarChartIcon />} />
+          <BottomNavigationAction label="実績" value="achievements" icon={<EmojiEventsIcon />} />
           <BottomNavigationAction label="Share Habits" value="share" icon={<PeopleAltIcon />} />
         </BottomNavigation>
       </Paper>

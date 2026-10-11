@@ -1,7 +1,7 @@
 import type { Habit } from './supabase';
 import type { AchievementContext, EvaluatedAchievement } from './achievements';
 
-// 統計ページの「自己ベスト」(UI を持たない純粋な関数)
+// データページの「自己ベスト」(UI を持たない純粋な関数)
 
 export interface PersonalBests {
   /** 一番長く続いた連続 */

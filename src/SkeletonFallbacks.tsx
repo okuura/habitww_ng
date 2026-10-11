@@ -11,6 +11,7 @@ import BottomNavigation from '@mui/material/BottomNavigation';
 import BottomNavigationAction from '@mui/material/BottomNavigationAction';
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import BarChartIcon from '@mui/icons-material/BarChart';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
 
 /** Full app shell skeleton — shown during auth check */
@@ -35,7 +36,8 @@ export function AppShellSkeleton() {
       <Paper sx={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 'appBar' }} elevation={3}>
         <BottomNavigation showLabels value="habits">
           <BottomNavigationAction label="記録" value="habits" icon={<CheckBoxIcon />} />
-          <BottomNavigationAction label="統計" value="stats" icon={<BarChartIcon />} />
+          <BottomNavigationAction label="データ" value="stats" icon={<BarChartIcon />} />
+          <BottomNavigationAction label="実績" value="achievements" icon={<EmojiEventsIcon />} />
           <BottomNavigationAction label="Share Habits" value="share" icon={<PeopleAltIcon />} />
         </BottomNavigation>
       </Paper>

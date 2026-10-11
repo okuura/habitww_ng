@@ -10,8 +10,6 @@ import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import type { Habit, HabitCompletion } from './supabase';
 import AchievementDots from './AchievementDots';
-import AchievementBook from './AchievementBook';
-import NearGoals from './NearGoals';
 import InsightCards from './InsightCards';
 import { pickInsights } from './insights';
 import { HabitComparison, PersonalBestTiles } from './PersonalRecords';
@@ -35,7 +33,7 @@ const TIME_SLOTS = [
 export default function StatsPage({ habits, completions }: StatsPageProps) {
   const theme = useTheme();
 
-  // バッジ・もうすぐ取れる目標の計算(過去の記録から一度に)
+  // 気づき・ふりかえりの計算(過去の記録から一度に。ふりかえりでその月に取ったバッジも見せる)
   const achievements = useMemo(() => {
     const ctx = buildContext(habits, completions);
     const evaluated = evaluateAll(ctx);
@@ -69,7 +67,7 @@ export default function StatsPage({ habits, completions }: StatsPageProps) {
         <Box sx={{ textAlign: 'center', py: 8 }}>
           <CalendarMonthIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 1.5 }} />
           <Typography variant="body1" sx={{ color: 'text.secondary' }}>
-            習慣を追加すると統計が表示されます
+            習慣を追加するとデータが表示されます
           </Typography>
         </Box>
       </Container>
@@ -78,19 +76,7 @@ export default function StatsPage({ habits, completions }: StatsPageProps) {
 
   return (
     <Container maxWidth="md" sx={{ py: { xs: 1.5, sm: 3 }, px: { xs: 1.5, sm: 3 } }}>
-      {/* 1. もうすぐ取れる */}
-      {achievements.goals.length > 0 && (
-        <Card
-          elevation={0}
-          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2 }}
-        >
-          <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-            <NearGoals goals={achievements.goals} />
-          </CardContent>
-        </Card>
-      )}
-
-      {/* 2. 今日の気づき */}
+      {/* 今日の気づき */}
       {achievements.insights.length > 0 && (
         <Card
           elevation={0}
@@ -105,17 +91,7 @@ export default function StatsPage({ habits, completions }: StatsPageProps) {
       {/* 先月のふりかえり(月の初めは大きく、それ以外は小さな入口) */}
       <MonthlyReviewEntry ctx={achievements.ctx} evaluated={achievements.evaluated} goals={achievements.goals} />
 
-      {/* 3. バッジ図鑑 */}
-      <Card
-        elevation={0}
-        sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2 }}
-      >
-        <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-          <AchievementBook ctx={achievements.ctx} achievements={achievements.evaluated} />
-        </CardContent>
-      </Card>
-
-      {/* 4. 自己ベスト */}
+      {/* 自己ベスト */}
       {achievements.ctx.allCompletionDates.length > 0 && (
         <Card
           elevation={0}
@@ -127,7 +103,7 @@ export default function StatsPage({ habits, completions }: StatsPageProps) {
         </Card>
       )}
 
-      {/* 5. 習慣くらべ */}
+      {/* 習慣くらべ */}
       <Card
         elevation={0}
         sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2 }}
@@ -137,7 +113,7 @@ export default function StatsPage({ habits, completions }: StatsPageProps) {
         </CardContent>
       </Card>
 
-      {/* 6. Total effort — dot visualisation (overflow visible so the party spills out) */}
+      {/* Total effort — dot visualisation (overflow visible so the party spills out) */}
       <Card
         elevation={0}
         sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2, overflow: 'visible' }}
@@ -147,7 +123,7 @@ export default function StatsPage({ habits, completions }: StatsPageProps) {
         </CardContent>
       </Card>
 
-      {/* 7. Time of day */}
+      {/* Time of day */}
       <Card
         elevation={0}
         sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2 }}
@@ -228,7 +204,7 @@ export default function StatsPage({ habits, completions }: StatsPageProps) {
         </CardContent>
       </Card>
 
-      {/* 8. 曜日ごとの実施時刻 */}
+      {/* 曜日ごとの実施時刻 */}
       {timedHabitIds(achievements.ctx).size > 0 && (
         <Card
           elevation={0}

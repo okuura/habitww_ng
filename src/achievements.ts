@@ -1,7 +1,7 @@
 import type { Habit, HabitCompletion } from './supabase';
 import { computeHabitBadges, rarityOf, RARITY_TIERS, toLocalDateString, type MonthBadge } from './habitStats';
 
-// 統計ページのバッジ図鑑と「もうすぐ取れる」の計算(UI を持たない純粋な関数)。
+// 実績ページのバッジ図鑑と「もうすぐ取れる」の計算(UI を持たない純粋な関数)。
 // どのバッジも過去の記録から判定するので、機能を入れる前の分も遡って取れる
 
 // --- 日付の小道具 -------------------------------------------------------------

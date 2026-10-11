@@ -1,16 +1,11 @@
-import { forwardRef, useEffect, useMemo, useState, type ReactElement, type Ref } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Dialog from '@mui/material/Dialog';
-import Slide from '@mui/material/Slide';
-import type { TransitionProps } from '@mui/material/transitions';
 import ButtonBase from '@mui/material/ButtonBase';
 import Button from '@mui/material/Button';
-import IconButton from '@mui/material/IconButton';
 import LinearProgress from '@mui/material/LinearProgress';
 import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
-import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import {
   CATEGORY_LABEL, TIER_LABEL,
   type AchievementCategory, type AchievementContext, type EvaluatedAchievement, type Tier,
@@ -19,8 +14,7 @@ import AchievementEmblem from './AchievementEmblem';
 import { emblemColor, METAL } from './achievementIcons';
 import { Medal } from './Badges';
 
-// バッジ図鑑。統計ページには集めた数と最近のバッジだけを出し、
-// 全部のバッジは「すべて見る」で開く別のページ(全画面)に並べる。
+// バッジ図鑑(実績ページ)。集めた数と最近のバッジ、その下にカテゴリごとの全部のバッジを並べる。
 // 前回見たときから増えたバッジには NEW を付ける(見たバッジは端末に覚えておく)
 
 const SEEN_KEY = 'habitww-seen-achievements';
@@ -43,10 +37,6 @@ const shortDate = (ds: string) => {
   const [, m, d] = ds.split('-').map(Number);
   return `${m}/${d}`;
 };
-
-const SlideLeft = forwardRef(function SlideLeft(props: TransitionProps & { children: ReactElement }, ref: Ref<unknown>) {
-  return <Slide direction="left" ref={ref} {...props} />;
-});
 
 interface Props {
   ctx: AchievementContext;
@@ -87,7 +77,6 @@ export default function AchievementBook({ ctx, achievements }: Props) {
     [achievements],
   );
 
-  const [pageOpen, setPageOpen] = useState(false);
   const [selected, setSelected] = useState<EvaluatedAchievement | null>(null);
 
   return (
@@ -104,48 +93,8 @@ export default function AchievementBook({ ctx, achievements }: Props) {
         ))}
       </Box>
 
-      <Button
-        fullWidth
-        onClick={() => setPageOpen(true)}
-        endIcon={<ChevronRightIcon />}
-        sx={{ mt: 2, borderRadius: 2, bgcolor: 'action.hover', color: 'text.primary', fontWeight: 700, py: 1 }}
-      >
-        すべてのバッジを見る
-        {newIds.size > 0 && (
-          <Box component="span" sx={{ ml: 1, px: 0.75, borderRadius: 1, bgcolor: 'error.main', color: '#fff', fontSize: '0.65rem', fontWeight: 800 }}>
-            NEW {newIds.size}
-          </Box>
-        )}
-      </Button>
-
-      {/* すべてのバッジ(別のページ) */}
-      <Dialog fullScreen open={pageOpen} onClose={() => setPageOpen(false)} TransitionComponent={SlideLeft}>
-        <Box
-          sx={{
-            position: 'sticky', top: 0, zIndex: 1, bgcolor: 'background.default',
-            pt: 'env(safe-area-inset-top, 0px)', borderBottom: '1px solid', borderColor: 'divider',
-          }}
-        >
-          <Box sx={{ height: 52, display: 'flex', alignItems: 'center', px: 0.5 }}>
-            <IconButton aria-label="戻る" onClick={() => setPageOpen(false)}>
-              <ArrowBackIosNewIcon fontSize="small" />
-            </IconButton>
-            <Typography sx={{ fontWeight: 800, fontSize: '1.05rem', flex: 1 }}>バッジ図鑑</Typography>
-            <Typography sx={{ fontWeight: 800, mr: 1.5 }}>
-              {earned.length}<Box component="span" sx={{ color: 'text.secondary', fontWeight: 600, fontSize: '0.75rem' }}> / {achievements.length}</Box>
-            </Typography>
-          </Box>
-        </Box>
-        <Box sx={{ bgcolor: 'background.default', flex: 1, px: 2, pt: 2, pb: 'calc(32px + env(safe-area-inset-bottom, 0px))', maxWidth: 720, width: '100%', mx: 'auto' }}>
-          <LinearProgress
-            variant="determinate"
-            value={(earned.length / achievements.length) * 100}
-            sx={{ height: 6, borderRadius: 3, bgcolor: 'action.hover', mb: 1.5, '& .MuiLinearProgress-bar': { borderRadius: 3, bgcolor: 'warning.main' } }}
-          />
-          <TierTally achievements={achievements} />
-          <AllBadges ctx={ctx} achievements={achievements} newIds={newIds} onSelect={setSelected} />
-        </Box>
-      </Dialog>
+      <Box sx={{ borderTop: '1px solid', borderColor: 'divider', mt: 2.5 }} />
+      <AllBadges ctx={ctx} achievements={achievements} newIds={newIds} onSelect={setSelected} />
 
       <Dialog
         open={!!selected}

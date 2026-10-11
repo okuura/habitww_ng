@@ -1,7 +1,7 @@
 import { useId } from 'react';
 import { alpha, darken, lighten } from '@mui/material/styles';
 
-// 統計のバッジ図鑑と習慣カードの裏面で使う、メダルとトロフィーの絵
+// 実績のバッジ図鑑と習慣カードの裏面で使う、メダルとトロフィーの絵
 
 // --- Medal (SVG) -----------------------------------------------------------
 // A ribbon-and-disc medal. `value`+`unit` engraved in the center, `year`

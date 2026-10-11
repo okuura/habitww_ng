@@ -2,7 +2,7 @@ import { addDays, daysBetween, parse, type AchievementContext } from './achievem
 import { rarityOf } from './habitStats';
 import { clock, habitTimeProfiles } from './timeStats';
 
-// 統計ページの「気づき」: 記録から計算した、本人もまだ気づいていないかもしれない豆知識。
+// データページの「気づき」: 記録から計算した、本人もまだ気づいていないかもしれない豆知識。
 // 条件を満たす候補だけを集め、日付を種にして選ぶ(同じ日は同じカード)
 
 /** 文と、強調する部分(em) */
@@ -85,7 +85,7 @@ function breaks(ctx: AchievementContext): Insight[] {
 /** 平均の実施時刻と、その変化 */
 function timeShift(ctx: AchievementContext): Insight[] {
   const out: Insight[] = [];
-  // 曜日の差をならした傾向(統計の「曜日ごとの実施時刻」と同じ値)
+  // 曜日の差をならした傾向(データの「曜日ごとの実施時刻」と同じ値)
   const profiles = habitTimeProfiles(ctx, 30);
   for (const p of profiles) {
     const h = p.habit;

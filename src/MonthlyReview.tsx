@@ -13,7 +13,7 @@ import { monthlyReview } from './records';
 import AchievementEmblem from './AchievementEmblem';
 
 // 月のふりかえり: 先月の記録を、1 枚ずつめくるストーリー形式で見せる。
-// 月の初め(1〜7 日)は統計ページの上に大きく案内し、それ以外の日は小さな入口だけ出す
+// 月の初め(1〜7 日)はデータページの上に大きく案内し、それ以外の日は小さな入口だけ出す
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
