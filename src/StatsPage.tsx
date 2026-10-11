@@ -15,6 +15,7 @@ import NearGoals from './NearGoals';
 import InsightCards from './InsightCards';
 import { pickInsights } from './insights';
 import { HabitComparison, PersonalBestTiles } from './PersonalRecords';
+import MonthlyReviewEntry from './MonthlyReview';
 import { buildContext, evaluateAll, nearGoals } from './achievements';
 
 interface StatsPageProps {
@@ -98,6 +99,9 @@ export default function StatsPage({ habits, completions }: StatsPageProps) {
           </CardContent>
         </Card>
       )}
+
+      {/* 先月のふりかえり(月の初めは大きく、それ以外は小さな入口) */}
+      <MonthlyReviewEntry ctx={achievements.ctx} evaluated={achievements.evaluated} goals={achievements.goals} />
 
       {/* 3. バッジ図鑑 */}
       <Card

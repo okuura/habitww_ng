@@ -1,5 +1,5 @@
 import type { Habit } from './supabase';
-import type { AchievementContext } from './achievements';
+import type { AchievementContext, EvaluatedAchievement } from './achievements';
 
 // 統計ページの「自己ベスト」(UI を持たない純粋な関数)
 
@@ -41,4 +41,67 @@ export function personalBests(ctx: AchievementContext): PersonalBests {
   }
 
   return { longestStreak, bestMonth, earliest, liveStreak };
+}
+
+// --- 月のふりかえり -----------------------------------------------------------
+
+export interface MonthlyReview {
+  year: number;
+  month: number;
+  total: number;
+  /** 何かしら実施した日数 */
+  activeDays: number;
+  monthDays: number;
+  /** 前の月との差(前の月に記録が無ければ null) */
+  diffFromPrev: number | null;
+  best: { habit: Habit; count: number; rate: number; longestRun: number } | null;
+  /** その月に取ったバッジ */
+  badges: EvaluatedAchievement[];
+  /** 一番多く実施した曜日(0=日曜) */
+  topWeekday: { day: number; count: number } | null;
+}
+
+const pad = (n: number) => String(n).padStart(2, '0');
+
+export function monthlyReview(ctx: AchievementContext, evaluated: EvaluatedAchievement[], year: number, month: number): MonthlyReview {
+  const prefix = `${year}-${pad(month)}`;
+  const prev = new Date(year, month - 2, 1);
+  const prevPrefix = `${prev.getFullYear()}-${pad(prev.getMonth() + 1)}`;
+  const monthDays = new Date(year, month, 0).getDate();
+
+  const inMonth = ctx.allCompletionDates.filter(d => d.startsWith(prefix));
+  const prevCount = ctx.allCompletionDates.filter(d => d.startsWith(prevPrefix)).length;
+
+  const weekdays = Array(7).fill(0);
+  for (const d of inMonth) weekdays[new Date(d + 'T00:00:00').getDay()]++;
+  const topDay = weekdays.indexOf(Math.max(...weekdays));
+
+  let best: MonthlyReview['best'] = null;
+  for (const h of ctx.habits) {
+    const dates = h.dates.filter(d => d.startsWith(prefix));
+    if (dates.length === 0) continue;
+    // 月の途中で作った習慣は作った日から数える
+    const created = new Date(h.habit.created_at);
+    const from = created.getFullYear() === year && created.getMonth() + 1 === month ? created.getDate() : 1;
+    const rate = dates.length / (monthDays - from + 1);
+    let longestRun = 0;
+    let run = 0;
+    for (let i = 0; i < dates.length; i++) {
+      run = i > 0 && Number(dates[i].slice(8)) === Number(dates[i - 1].slice(8)) + 1 ? run + 1 : 1;
+      longestRun = Math.max(longestRun, run);
+    }
+    if (!best || dates.length > best.count || (dates.length === best.count && rate > best.rate)) {
+      best = { habit: h.habit, count: dates.length, rate: Math.min(1, rate), longestRun };
+    }
+  }
+
+  return {
+    year, month, monthDays,
+    total: inMonth.length,
+    activeDays: new Set(inMonth).size,
+    diffFromPrev: prevCount > 0 ? inMonth.length - prevCount : null,
+    best,
+    badges: evaluated.filter(a => a.state.earned && a.state.earnedDate?.startsWith(prefix)),
+    topWeekday: inMonth.length > 0 ? { day: topDay, count: weekdays[topDay] } : null,
+  };
 }
