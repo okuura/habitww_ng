@@ -1,5 +1,6 @@
 import { addDays, daysBetween, parse, type AchievementContext } from './achievements';
 import { rarityOf } from './habitStats';
+import { clock, habitTimeProfiles } from './timeStats';
 
 // 統計ページの「気づき」: 記録から計算した、本人もまだ気づいていないかもしれない豆知識。
 // 条件を満たす候補だけを集め、日付を種にして選ぶ(同じ日は同じカード)
@@ -19,7 +20,6 @@ export interface Insight {
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 const pct = (r: number) => `${Math.round(r * 100)}%`;
-const clock = (min: number) => `${Math.floor(min / 60)}:${String(Math.round(min % 60)).padStart(2, '0')}`;
 const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
 const md = (ds: string) => { const d = parse(ds); return `${d.getMonth() + 1}月${d.getDate()}日`; };
 
@@ -85,29 +85,23 @@ function breaks(ctx: AchievementContext): Insight[] {
 /** 平均の実施時刻と、その変化 */
 function timeShift(ctx: AchievementContext): Insight[] {
   const out: Insight[] = [];
-  const recentFrom = addDays(ctx.todayStr, -30);
-  const prevFrom = addDays(ctx.todayStr, -60);
-  for (const h of ctx.habits) {
-    const times = ctx.timed.filter(t => t.habitId === h.habit.id);
-    // 深夜 0〜3 時の実施は前日の夜の続きとして数える(平均が昼にずれないように)
-    const minutes = (t: { hour: number; minute: number }) => (t.hour < 4 ? t.hour + 24 : t.hour) * 60 + t.minute;
-    const recent = times.filter(t => t.date >= recentFrom).map(minutes);
-    const prev = times.filter(t => t.date >= prevFrom && t.date < recentFrom).map(minutes);
-    if (recent.length >= 5 && prev.length >= 5) {
-      const diff = Math.round(avg(recent) - avg(prev));
-      if (Math.abs(diff) >= 10) {
-        out.push({
-          id: `time-${h.habit.id}`, kind: 'time', weight: 3, color: h.habit.color,
-          parts: [`${h.habit.name}の平均実施時刻は`, { em: clock(avg(recent) % 1440) }, '。前の30日より', { em: `${Math.abs(diff)}分${diff < 0 ? '早く' : '遅く'}` }, 'なりました'],
-        });
-        continue;
-      }
+  // 曜日の差をならした傾向(統計の「曜日ごとの実施時刻」と同じ値)
+  const profiles = habitTimeProfiles(ctx, 30);
+  for (const p of profiles) {
+    const h = p.habit;
+    if (p.trend && Math.abs(p.trend.diff) >= 10 && p.mean !== null) {
+      const diff = p.trend.diff;
+      out.push({
+        id: `time-${h.id}`, kind: 'time', weight: 3, color: h.color,
+        parts: [`${h.name}の最近30日の平均実施時刻は`, { em: clock(p.mean) }, '。前の30日より', { em: `${Math.abs(diff)}分${diff < 0 ? '早く' : '遅く'}` }, 'なりました'],
+      });
+      continue;
     }
-    const all = times.map(minutes);
+    const all = ctx.timed.filter(t => t.habitId === h.id).map(t => (t.hour < 4 ? t.hour + 24 : t.hour) * 60 + t.minute);
     if (all.length >= 10) {
       out.push({
-        id: `time-${h.habit.id}`, kind: 'time', weight: 1, color: h.habit.color,
-        parts: [`${h.habit.name}をするのは、たいてい`, { em: `${clock(avg(all) % 1440)}ごろ` }],
+        id: `time-${h.id}`, kind: 'time', weight: 1, color: h.color,
+        parts: [`${h.name}をするのは、たいてい`, { em: `${clock(avg(all) % 1440)}ごろ` }],
       });
     }
   }

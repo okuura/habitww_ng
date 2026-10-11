@@ -16,6 +16,8 @@ import InsightCards from './InsightCards';
 import { pickInsights } from './insights';
 import { HabitComparison, PersonalBestTiles } from './PersonalRecords';
 import MonthlyReviewEntry from './MonthlyReview';
+import HabitTimes from './HabitTimes';
+import { timedHabitIds } from './timeStats';
 import { buildContext, evaluateAll, nearGoals } from './achievements';
 
 interface StatsPageProps {
@@ -225,6 +227,18 @@ export default function StatsPage({ habits, completions }: StatsPageProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* 8. 曜日ごとの実施時刻 */}
+      {timedHabitIds(achievements.ctx).size > 0 && (
+        <Card
+          elevation={0}
+          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2 }}
+        >
+          <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+            <HabitTimes ctx={achievements.ctx} />
+          </CardContent>
+        </Card>
+      )}
     </Container>
   );
 }
