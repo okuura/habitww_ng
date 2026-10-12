@@ -15,7 +15,7 @@
 
 サーバーサイドコードは存在しない。純粋なクライアントサイド SPA で、ブラウザから
 Supabase の Data API を直接呼ぶ構成。ルーターは使わず、`App.tsx` 内の
-`useState<'habits' | 'stats' | 'share'>` と MUI `BottomNavigation` で画面を切り替える
+`useState<'habits' | 'stats' | 'achievements' | 'cowork'>` と MUI `BottomNavigation` で画面を切り替える
 (URL はナビゲーションで変化しない)。
 
 ## ディレクトリ構成
@@ -31,9 +31,11 @@ habitww_ng/
 │   ├── theme.ts          # MUI テーマ
 │   ├── LoginPage.tsx     # Google ログイン画面
 │   ├── StatsPage.tsx     # 統計画面
-│   ├── ShareHabitsPage.tsx # 共有された習慣の閲覧画面(Realtime 購読)
-│   ├── ShareModal.tsx    # 共有リンク/QR 生成、X(Twitter)シェア
-│   ├── QRScannerDialog.tsx # カメラで共有QRを読み取る(getUserMedia + jsqr)
+│   ├── CoworkPage.tsx    # Cowork Habits: グループ一覧・招待 QR・承認・メニュー(Realtime 購読)
+│   ├── CoworkGroupCard.tsx # グループ 1 つのカード(今日の状況・みんなで達成のグリッド)
+│   ├── CoworkCreateDialog.tsx / CoworkJoinDialog.tsx / CoworkHabitPicker.tsx
+│   ├── cowork.ts         # みんなで達成した日・連続の計算(純粋関数)
+│   ├── QRScannerDialog.tsx # カメラで招待QRを読み取る(getUserMedia + jsqr)
 │   ├── ActivityGrid.tsx  # 草グラフ
 │   ├── AchievementDots.tsx
 │   ├── SkeletonFallbacks.tsx # lazy load 中のフォールバック
@@ -58,12 +60,18 @@ habitww_ng/
   「実績バッジ」カード(`Badges.tsx`)は月間パーフェクトのメダル(月の1日〜末日を
   全日実施、年号刻印)・連続記録と自己ベスト・累計マイルストーンのトロフィー(SVG、
   常時の後光アニメーション)を表示
-- **共有** (`ShareModal.tsx` / `ShareHabitsPage.tsx` / `QRScannerDialog.tsx`):
-  - 自分の習慣の共有リンク(`/?shareToken=<token>`)と QR を生成
-  - 受け取り側は URL を開くか QR をカメラで読むと閲覧登録され、
-    以後その習慣の記録を**閲覧専用**でリアルタイムに見られる
-  - shareToken は `App.tsx` 起動時に `URLSearchParams` で読み取り、
-    処理後に `history.replaceState` で URL から除去する
+- **Cowork Habits** (`CoworkPage.tsx` / `CoworkGroupCard.tsx` / `cowork.ts`):
+  - 仲間とグループを作り、各メンバーが**自分の習慣を 1 つ**登録する(1 つの習慣を
+    共同編集するのではない。記録は各自の habits / habit_completions のまま)
+  - 作成者の招待リンク(`/?cowork=<invite_token>`)か QR から参加を申請。参加時に
+    既存の習慣を紐づけるか、同名の習慣を新しく作るかを選ぶ
+  - 加入は承認制。承認できる人は「作成者だけ」か「メンバー全員」(`cowork_groups.approval`)
+  - カードには各メンバーの今日の達成、12 週の「みんなで達成した日」(承認済みメンバーが
+    2 人以上いて全員達成した日)、その連続日数を出す。記録画面には他人の情報を出さない
+  - 招待トークンは `App.tsx` 起動時に `URLSearchParams` で読み取り、RPC `cowork_preview`
+    で下見してから `history.replaceState` で URL から除去する
+  - 旧 Share Habits(`habit_shares` / `shared_habit_viewers`)は画面から外した。
+    テーブルとポリシーは残っている
 
 ## データモデル
 
@@ -73,8 +81,11 @@ habitww_ng/
 erDiagram
     auth_users ||--o{ habits : "user_id"
     habits ||--o{ habit_completions : "habit_id (CASCADE)"
-    habits ||--o{ habit_shares : "habit_id"
+    habits ||--o{ habit_shares : "habit_id (旧 Share Habits・未使用)"
     habit_shares ||--o{ shared_habit_viewers : "share_id"
+    auth_users ||--o{ cowork_groups : "owner_id"
+    cowork_groups ||--o{ cowork_members : "group_id (CASCADE)"
+    habits ||--o{ cowork_members : "habit_id (CASCADE)"
 
     habits {
         uuid id PK
@@ -107,9 +118,15 @@ erDiagram
 
 - `habits` / `habit_completions`: 所有者(`habits.user_id = auth.uid()`)のみ
   読み書き可。completions は habit の所有を EXISTS で辿って判定
-- 共有: `shared_habit_viewers` に登録された閲覧者は対象 habit と
-  completions を **SELECT のみ** 可能。共有前の習慣名確認用に
-  `habit_shares` に載っている習慣名は誰でも読める
+- Cowork: `cowork_groups` は承認済みメンバーと申請中の本人が読め、作成者だけが
+  更新・削除できる。`cowork_members` への INSERT はポリシーを作らず RPC
+  `cowork_join`(security definer、招待トークンを検証)経由のみ。同じグループの
+  承認済みメンバーは、メンバーの habits(名前・色)と承認済みメンバーの
+  completions を **SELECT のみ** 可能。承認は RPC `cowork_approve`
+  (`is_cowork_approver` で判定)。ポリシー内の自己参照は security definer の
+  `is_cowork_member` / `cowork_my_status` で再帰を避けている
+- 旧共有: `shared_habit_viewers` に登録された閲覧者は対象 habit と
+  completions を **SELECT のみ** 可能(画面からは外したがポリシーは残る)
 - 履歴上の注意: `20260705035317` が completions の UPDATE を全開放して
   いたが、`20260830000000_fix_completion_update_policy.sql` で所有者限定に修正済み
 
@@ -122,5 +139,5 @@ erDiagram
 - **セッション**: supabase-js のデフォルト(localStorage 保存、自動リフレッシュ)
 - **PWA**: `public/manifest.json` で standalone 表示・ホーム追加に対応。
   Service Worker は未実装(オフライン非対応)
-- **Realtime**: `ShareHabitsPage.tsx` が `habit_completions` / `habit_shares` の
-  postgres_changes を購読(チャンネル名 `share-habits-realtime`)
+- **Realtime**: `CoworkPage.tsx` が `habit_completions` / `cowork_members` /
+  `cowork_groups` の postgres_changes を購読(チャンネル名 `cowork-realtime`)

@@ -12,7 +12,7 @@ import BottomNavigationAction from '@mui/material/BottomNavigationAction';
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
+import Diversity3Icon from '@mui/icons-material/Diversity3';
 
 /** Full app shell skeleton — shown during auth check */
 export function AppShellSkeleton() {
@@ -38,7 +38,7 @@ export function AppShellSkeleton() {
           <BottomNavigationAction label="記録" value="habits" icon={<CheckBoxIcon />} />
           <BottomNavigationAction label="データ" value="stats" icon={<BarChartIcon />} />
           <BottomNavigationAction label="実績" value="achievements" icon={<EmojiEventsIcon />} />
-          <BottomNavigationAction label="Share Habits" value="share" icon={<PeopleAltIcon />} />
+          <BottomNavigationAction label="Cowork" value="cowork" icon={<Diversity3Icon />} />
         </BottomNavigation>
       </Paper>
     </Box>
@@ -100,8 +100,8 @@ export function StatsPageSkeleton() {
   );
 }
 
-/** Share page skeleton — matches ShareHabitsPage layout */
-export function SharePageSkeleton() {
+/** Cowork page skeleton — matches CoworkPage layout */
+export function CoworkPageSkeleton() {
   return (
     <Container maxWidth="md" sx={{ py: { xs: 1.5, sm: 3 }, px: { xs: 1.5, sm: 3 } }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>

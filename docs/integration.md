@@ -81,11 +81,13 @@ SQL Editor で実行するか、`npx supabase link` → `npx supabase db push`�
 
 構築時に追加で必要な設定:
 
-1. **Realtime**: `habit_completions` と `habit_shares` を publication
-   `supabase_realtime` に追加(共有画面のリアルタイム反映に必須)
+1. **Realtime**: `habit_completions`、`cowork_groups`、`cowork_members` を publication
+   `supabase_realtime` に追加(Cowork Habits 画面のリアルタイム反映に必須。
+   `20261012000000_create_cowork_habits.sql` の末尾でも追加している)
    ```sql
    ALTER PUBLICATION supabase_realtime ADD TABLE habit_completions;
-   ALTER PUBLICATION supabase_realtime ADD TABLE habit_shares;
+   ALTER PUBLICATION supabase_realtime ADD TABLE cowork_groups;
+   ALTER PUBLICATION supabase_realtime ADD TABLE cowork_members;
    ```
 2. プロジェクト作成時のオプションは Data API 有効・テーブル自動公開 ON で作る
    (マイグレーションに GRANT 文がなく、自動公開前提のため)

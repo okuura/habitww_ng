@@ -27,7 +27,7 @@ import Divider from '@mui/material/Divider';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import CircularProgress from '@mui/material/CircularProgress';
-import { AppShellSkeleton, StatsPageSkeleton, SharePageSkeleton } from './SkeletonFallbacks';
+import { AppShellSkeleton, StatsPageSkeleton, CoworkPageSkeleton } from './SkeletonFallbacks';
 import Paper from '@mui/material/Paper';
 import BottomNavigation from '@mui/material/BottomNavigation';
 import BottomNavigationAction from '@mui/material/BottomNavigationAction';
@@ -47,12 +47,11 @@ import SettingsBrightnessIcon from '@mui/icons-material/SettingsBrightness';
 import SettingsIcon from '@mui/icons-material/Settings';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ThreeSixtyIcon from '@mui/icons-material/ThreeSixty';
-import ShareIcon from '@mui/icons-material/Share';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import BoltIcon from '@mui/icons-material/Bolt';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
+import Diversity3Icon from '@mui/icons-material/Diversity3';
 import { alpha, darken, lighten } from '@mui/material/styles';
 import { keyframes } from '@emotion/react';
 import type { User } from '@supabase/supabase-js';
@@ -79,7 +78,7 @@ import {
   clearCachedData,
   type Habit,
   type HabitCompletion,
-  type HabitShare,
+  type CoworkPreview,
   type HabitNote,
 } from './supabase';
 import ActivityGrid from './ActivityGrid';
@@ -91,10 +90,10 @@ import LoginPage from './LoginPage';
 
 const StatsPage = lazy(() => import('./StatsPage'));
 const AchievementsPage = lazy(() => import('./AchievementsPage'));
-const ShareModal = lazy(() => import('./ShareModal'));
 const HabitTimeDialog = lazy(() => import('./HabitTimeDialog'));
 const QRScannerDialog = lazy(() => import('./QRScannerDialog'));
-const ShareHabitsPage = lazy(() => import('./ShareHabitsPage'));
+const CoworkPage = lazy(() => import('./CoworkPage'));
+const CoworkJoinDialog = lazy(() => import('./CoworkJoinDialog'));
 const HabitCardBack = lazy(() => import('./HabitCardBack'));
 
 // Last known data, read once at startup. Lets the app paint real content
@@ -531,25 +530,20 @@ function AppContent() {
   const [deleteAccountDialogOpen, setDeleteAccountDialogOpen] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deleteHabitTarget, setDeleteHabitTarget] = useState<string | null>(null);
-  const [page, setPage] = useState<'habits' | 'stats' | 'achievements' | 'share'>('habits');
+  const [page, setPage] = useState<'habits' | 'stats' | 'achievements' | 'cowork'>('habits');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editingHabitId, setEditingHabitId] = useState<string | null>(null);
   const [editingHabitName, setEditingHabitName] = useState('');
   const [yesterdayHabitTarget, setYesterdayHabitTarget] = useState<string | null>(null);
 
-  // Share feature state
-  const [myShares, setMyShares] = useState<Map<string, HabitShare>>(new Map());
+  // 習慣メニュー・QR・Cowork Habits
   const [habitMenuAnchor, setHabitMenuAnchor] = useState<null | HTMLElement>(null);
   const [habitMenuTarget, setHabitMenuTarget] = useState<string | null>(null);
-  const [shareModalHabit, setShareModalHabit] = useState<Habit | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [snackbarMsg, setSnackbarMsg] = useState<string | null>(null);
-  const [pendingShareInfo, setPendingShareInfo] = useState<{
-    shareId: string;
-    habitName: string;
-    sharerName: string;
-  } | null>(null);
-  const [addingShare, setAddingShare] = useState(false);
+  // 招待リンク/QR から来た参加の申し込み(下見の結果を持つ)
+  const [pendingCowork, setPendingCowork] = useState<{ token: string; preview: CoworkPreview } | null>(null);
+  const [coworkReload, setCoworkReload] = useState(0);
 
   const todayStr = toLocalDateString(new Date());
   const yesterday = new Date();
@@ -602,92 +596,63 @@ function AppContent() {
     });
   }, [habits, completions, notes, loading, user]);
 
-  const fetchMyShares = useCallback(async () => {
-    if (!user) return;
-    const { data } = await supabase
-      .from('habit_shares')
-      .select('*')
-      .eq('user_id', user.id);
-    const map = new Map<string, HabitShare>();
-    for (const s of data ?? []) map.set(s.habit_id, s as HabitShare);
-    setMyShares(map);
-  }, [user]);
-
   useEffect(() => {
     if (user) {
       fetchData();
-      fetchMyShares();
     }
-  }, [user, fetchData, fetchMyShares]);
+  }, [user, fetchData]);
 
-  // Handle ?shareToken=... URL param (deep link from QR scan)
-  useEffect(() => {
-    if (!user) return;
-    const params = new URLSearchParams(window.location.search);
-    const shareToken = params.get('shareToken');
-    if (!shareToken) return;
-    window.history.replaceState({}, '', window.location.pathname);
-    processScanToken(shareToken);
-  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const processScanToken = async (rawValue: string) => {
-    // Extract token from full URL or treat as raw token
+  /** 招待の URL かトークンそのものを受け取り、下見をして参加ダイアログを出す */
+  const processCoworkToken = async (rawValue: string) => {
     let token = rawValue.trim();
     try {
       const url = new URL(rawValue);
-      const t = url.searchParams.get('shareToken');
+      const t = url.searchParams.get('cowork');
       if (t) token = t;
+      else {
+        if (url.searchParams.get('shareToken')) setSnackbarMsg('これは古い形式の共有です。Cowork Habits のグループに招待してもらってください');
+        return;
+      }
     } catch {
-      // rawValue is already a token
+      // rawValue はトークンそのもの
     }
-
-    const { data: share } = await supabase
-      .from('habit_shares')
-      .select('id, user_id, sharer_name, habits!habit_id(name)')
-      .eq('share_token', token)
-      .maybeSingle();
-
-    if (!share) {
-      setSnackbarMsg('無効または期限切れのQRコードです');
+    const { data, error } = await supabase.rpc('cowork_preview', { p_token: token });
+    if (error || !data) {
+      setSnackbarMsg('無効または期限切れの招待です');
       return;
     }
-    if ((share as { user_id: string }).user_id === user?.id) {
-      setSnackbarMsg('自分の習慣のQRコードです');
-      return;
-    }
-
-    const habitName = ((share as { habits?: { name?: string } }).habits?.name) ?? '不明な習慣';
-
-    setPendingShareInfo({
-      shareId: share.id as string,
-      habitName,
-      sharerName: (share as { sharer_name: string }).sharer_name,
-    });
-    setPage('share');
+    setPendingCowork({ token, preview: data as CoworkPreview });
+    setPage('cowork');
   };
 
   const handleScanResult = (rawValue: string) => {
     setScannerOpen(false);
-    processScanToken(rawValue);
+    processCoworkToken(rawValue);
   };
 
-  const handleConfirmAddShare = async () => {
-    if (!pendingShareInfo) return;
-    setAddingShare(true);
-    const { error } = await supabase
-      .from('shared_habit_viewers')
-      .insert({ habit_share_id: pendingShareInfo.shareId });
-
-    if (error && error.code === '23505') {
-      setSnackbarMsg('すでに追加済みです');
-    } else if (error) {
-      setSnackbarMsg('追加に失敗しました。もう一度お試しください');
-    } else {
-      setSnackbarMsg(`「${pendingShareInfo.habitName}」を追加しました`);
-    }
-    setAddingShare(false);
-    setPendingShareInfo(null);
+  /** Cowork から「新しく作る」で習慣を作る(色は順番に、末尾に追加) */
+  const createHabitQuick = async (name: string): Promise<Habit | null> => {
+    if (!user || !name.trim()) return null;
+    const { data: created, error } = await supabase.from('habits').insert({
+      name: name.trim(),
+      color: HABIT_COLORS[habits.length % HABIT_COLORS.length],
+      user_id: user.id,
+      sort_order: Math.max(-1, ...habits.map(h => h.sort_order ?? 0)) + 1,
+    }).select().single();
+    if (error || !created) return null;
+    await fetchData();
+    return created as Habit;
   };
+
+  // 招待リンク(?cowork=<token>)。旧 Share Habits のリンク(?shareToken=)は案内だけ出す
+  useEffect(() => {
+    if (!user) return;
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('cowork') && !params.has('shareToken')) return;
+    const href = window.location.href;
+    window.history.replaceState({}, '', window.location.pathname);
+    processCoworkToken(href);
+  }, [user]);
 
   const todayIntensity = new Map<string, number>(
     completions
@@ -923,7 +888,7 @@ function AppContent() {
 
   /** カード右上のボタン(裏返す ↻ と ︙ メニュー)。表と裏で共通 */
   // 表面(草グラフ)は ︙ だけ。裏面には表に戻す ↻ も置く
-  const cardButtons = (habitId: string, isShared: boolean, showFlip = false) => (
+  const cardButtons = (habitId: string, showFlip = false) => (
     <>
       {showFlip && <IconButton
         size="small"
@@ -940,7 +905,7 @@ function AppContent() {
           setHabitMenuTarget(habitId);
         }}
         sx={{
-          color: isShared ? 'primary.main' : 'text.disabled',
+          color: 'text.disabled',
           '&:hover': { color: 'text.primary' },
         }}
       >
@@ -962,7 +927,6 @@ function AppContent() {
     await supabase.auth.signOut();
     setHabits([]);
     setCompletions([]);
-    setMyShares(new Map());
   };
 
   const handleDeleteAccount = async () => {
@@ -1066,7 +1030,7 @@ function AppContent() {
                 color: darkMode ? '#fff' : 'primary.main',
               }}
             >
-              {page === 'habits' ? 'Habitww' : page === 'stats' ? 'Habits Insight' : page === 'achievements' ? 'Achievements' : 'Share Habits'}
+              {page === 'habits' ? 'Habitww' : page === 'stats' ? 'Habits Insight' : page === 'achievements' ? 'Achievements' : 'Cowork Habits'}
             </Typography>
           </Box>
           {!loading && habits.length > 0 && page === 'habits' && (
@@ -1205,7 +1169,6 @@ function AppContent() {
                   const currentIntensity = todayIntensity.get(habit.id) ?? 0;
                   const streak = calculateStreak(datesSet);
                   const totalCount = datesSet.size;
-                  const isShared = myShares.has(habit.id);
 
                   const paperBg = paperColorFor(darkMode ? 'dark' : 'light');
 
@@ -1227,7 +1190,7 @@ function AppContent() {
                             completions={completionsOf(habit.id)}
                             note={notes.get(habit.id)}
                             onSaveNote={patch => handleSaveNote(habit.id, patch)}
-                            actions={cardButtons(habit.id, isShared, true)}
+                            actions={cardButtons(habit.id, true)}
                           />
                         </Suspense>
                       }
@@ -1318,7 +1281,7 @@ function AppContent() {
                             <Typography variant="caption" sx={{ color: 'text.secondary', minWidth: 40, textAlign: 'right' }}>
                               計 {totalCount}日
                             </Typography>
-                            {cardButtons(habit.id, isShared)}
+                            {cardButtons(habit.id)}
                           </Box>
                         </Box>
 
@@ -1444,9 +1407,16 @@ function AppContent() {
           </Suspense>
         )}
 
-        {page === 'share' && user && (
-          <Suspense fallback={<SharePageSkeleton />}>
-            <ShareHabitsPage user={user} onScanQR={() => setScannerOpen(true)} />
+        {page === 'cowork' && user && (
+          <Suspense fallback={<CoworkPageSkeleton />}>
+            <CoworkPage
+              user={user}
+              habits={habits}
+              onCreateHabit={createHabitQuick}
+              onScanQR={() => setScannerOpen(true)}
+              onMessage={setSnackbarMsg}
+              reloadKey={coworkReload}
+            />
           </Suspense>
         )}
       </Box>
@@ -1480,24 +1450,6 @@ function AppContent() {
                 </Typography>
               ) : null;
             })()}
-          </Box>
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            const target = habits.find(h => h.id === habitMenuTarget);
-            setHabitMenuAnchor(null);
-            if (target) setShareModalHabit(target);
-          }}
-          sx={{ gap: 1.5, py: 1.25 }}
-        >
-          <ShareIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-          <Box>
-            <Typography variant="body2">Share Habits</Typography>
-            {habitMenuTarget && myShares.has(habitMenuTarget) && (
-              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: -0.25 }}>
-                共有中 — タップでQRを表示
-              </Typography>
-            )}
           </Box>
         </MenuItem>
         <MenuItem
@@ -1549,7 +1501,7 @@ function AppContent() {
           <BottomNavigationAction label="記録" value="habits" icon={<CheckBoxIcon />} />
           <BottomNavigationAction label="データ" value="stats" icon={<BarChartIcon />} />
           <BottomNavigationAction label="実績" value="achievements" icon={<EmojiEventsIcon />} />
-          <BottomNavigationAction label="Share Habits" value="share" icon={<PeopleAltIcon />} />
+          <BottomNavigationAction label="Cowork" value="cowork" icon={<Diversity3Icon />} />
         </BottomNavigation>
       </Paper>
 
@@ -1667,36 +1619,6 @@ function AppContent() {
         </DialogActions>
       </Dialog>
 
-      {/* Pending share confirmation (after QR scan) */}
-      <Dialog
-        open={!!pendingShareInfo}
-        onClose={() => setPendingShareInfo(null)}
-        maxWidth="xs" fullWidth
-        PaperProps={{ sx: { borderRadius: 3 } }}
-      >
-        <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>友達の習慣を追加</DialogTitle>
-        <DialogContent>
-          <DialogContentText sx={{ color: 'text.secondary' }}>
-            <strong>{pendingShareInfo?.sharerName}</strong> さんの習慣「
-            <strong>{pendingShareInfo?.habitName}</strong>」を追加しますか？
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
-          <Button onClick={() => setPendingShareInfo(null)} sx={{ borderRadius: 2 }}>
-            キャンセル
-          </Button>
-          <Button
-            variant="contained"
-            onClick={handleConfirmAddShare}
-            disabled={addingShare}
-            startIcon={addingShare ? <CircularProgress size={16} color="inherit" /> : undefined}
-            sx={{ borderRadius: 2, fontWeight: 700 }}
-          >
-            追加する
-          </Button>
-        </DialogActions>
-      </Dialog>
-
       {/* 実施時間ダイアログ */}
       {timeDialogHabit && (
         <Suspense fallback={null}>
@@ -1709,26 +1631,23 @@ function AppContent() {
         </Suspense>
       )}
 
-      {/* Share Modal (QR code display) */}
-      {shareModalHabit && user && (
+      {/* Cowork: 招待からの参加 */}
+      {pendingCowork && user && (
         <Suspense fallback={null}>
-        <ShareModal
-          open={!!shareModalHabit}
-          onClose={() => setShareModalHabit(null)}
-          habit={shareModalHabit}
-          existingShare={myShares.get(shareModalHabit.id)}
-          user={user}
-          onShareCreated={share => {
-            setMyShares(prev => new Map(prev).set(share.habit_id, share));
-          }}
-          onShareDeleted={habitId => {
-            setMyShares(prev => {
-              const next = new Map(prev);
-              next.delete(habitId);
-              return next;
-            });
-          }}
-        />
+          <CoworkJoinDialog
+            token={pendingCowork.token}
+            preview={pendingCowork.preview}
+            habits={habits}
+            user={user}
+            onCreateHabit={createHabitQuick}
+            onClose={() => setPendingCowork(null)}
+            onError={setSnackbarMsg}
+            onJoined={() => {
+              setPendingCowork(null);
+              setCoworkReload(n => n + 1);
+              setSnackbarMsg('参加を申請しました。承認されるとグループが表示されます');
+            }}
+          />
         </Suspense>
       )}
 

@@ -141,3 +141,37 @@ export interface SharedHabitViewer {
   sort_order: number;
   created_at: string;
 }
+
+// --- Cowork Habits: 仲間とグループを作り、各自が自分の習慣を 1 つ登録して達成を共有する ---
+
+export interface CoworkGroup {
+  id: string;
+  name: string;
+  owner_id: string;
+  invite_token: string;
+  /** 加入を承認できる人: 作成者だけ / 承認済みメンバー全員 */
+  approval: 'owner' | 'anyone';
+  created_at: string;
+}
+
+export interface CoworkMember {
+  id: string;
+  group_id: string;
+  user_id: string;
+  habit_id: string;
+  display_name: string;
+  status: 'pending' | 'approved';
+  joined_at: string;
+  approved_at: string | null;
+}
+
+/** 参加前の下見(RPC cowork_preview の戻り) */
+export interface CoworkPreview {
+  group_id: string;
+  name: string;
+  approval: 'owner' | 'anyone';
+  owner_name: string | null;
+  owner_habit_name: string | null;
+  members: { display_name: string; habit_name: string }[];
+  my_status: 'pending' | 'approved' | null;
+}
