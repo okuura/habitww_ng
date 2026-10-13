@@ -1,5 +1,5 @@
 import type { Habit, HabitCompletion } from './supabase';
-import { computeHabitBadges, rarityOf, RARITY_TIERS, toLocalDateString, type MonthBadge } from './habitStats';
+import { computeHabitBadges, rarityOf, RARITY_TIERS, toLocalDateString, type MonthBadge, type Rarity } from './habitStats';
 
 // 実績ページのバッジ図鑑と「もうすぐ取れる」の計算(UI を持たない純粋な関数)。
 // どのバッジも過去の記録から判定するので、機能を入れる前の分も遡って取れる
@@ -215,7 +215,7 @@ const total = (n: number, name: string, tier: Tier): Achievement => ({
   evaluate: ctx => counted(ctx.allCompletionDates, n),
 });
 
-const rank = (rarity: 'bronze' | 'silver' | 'gold' | 'holo', name: string, tier: Tier): Achievement => {
+const rank = (rarity: Exclude<Rarity, 'normal'>, name: string, tier: Tier): Achievement => {
   const card = RARITY_TIERS.find(t => t.rarity === rarity)!;
   return {
     id: `rank-${rarity}`, category: 'rank', name, tier, icon: `rank-${rarity}`,
@@ -310,6 +310,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   rank('bronze', 'ブロンズカード', 'bronze'),
   rank('silver', 'シルバーカード', 'silver'),
   rank('gold', 'ゴールドカード', 'gold'),
+  rank('platinum', 'プラチナカード', 'platinum'),
   rank('holo', 'ホロカード', 'platinum'),
 
   months(1, '完璧な一か月', 'silver'),
@@ -431,7 +432,7 @@ export interface NearGoal {
   today: boolean;
 }
 
-const RANK_TIER: Record<string, Tier> = { bronze: 'bronze', silver: 'silver', gold: 'gold', holo: 'platinum' };
+const RANK_TIER: Record<string, Tier> = { bronze: 'bronze', silver: 'silver', gold: 'gold', platinum: 'platinum', holo: 'platinum' };
 
 /** 今日の実施で 1 つ進むバッジ(時間がたつだけで進むものは除く) */
 const DAILY: AchievementCategory[] = ['streak', 'total', 'perfectDay', 'comeback', 'rank'];

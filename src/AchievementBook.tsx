@@ -13,11 +13,19 @@ import {
 import AchievementEmblem from './AchievementEmblem';
 import { emblemColor, METAL } from './achievementIcons';
 import { Medal } from './Badges';
+import { alpha, keyframes, useTheme } from '@mui/material/styles';
 
 // バッジ図鑑(実績ページ)。集めた数と最近のバッジ、その下にカテゴリごとの全部のバッジを並べる。
 // 前回見たときから増えたバッジには NEW を付ける(見たバッジは端末に覚えておく)
 
 const SEEN_KEY = 'habitww-seen-achievements';
+/** 取りたてのメダル(月末から何日以内か)を光らせる */
+const FRESH_MEDAL_DAYS = 7;
+
+const medalGlow = keyframes`
+  0%, 100% { filter: drop-shadow(0 2px 3px rgba(0,0,0,0.35)) drop-shadow(0 0 0 rgba(255,196,0,0)); }
+  50% { filter: drop-shadow(0 2px 3px rgba(0,0,0,0.35)) drop-shadow(0 0 8px rgba(255,196,0,0.95)); }
+`;
 const TIERS: Tier[] = ['bronze', 'silver', 'gold', 'platinum'];
 
 function readSeen(): Set<string> | null {
@@ -199,13 +207,6 @@ function AllBadges({ ctx, achievements, newIds, onSelect }: {
     return [...map.entries()];
   }, [achievements]);
 
-  const medals = useMemo(
-    () => ctx.habits
-      .flatMap(h => h.perfectMonths.map(m => ({ habit: h.habit, ...m })))
-      .sort((a, b) => b.year - a.year || b.month - a.month),
-    [ctx],
-  );
-
   return (
     <>
       {groups.map(([category, list]) => (
@@ -220,19 +221,80 @@ function AllBadges({ ctx, achievements, newIds, onSelect }: {
             {list.map(a => <BadgeCell key={a.id} a={a} isNew={newIds.has(a.id)} onClick={() => onSelect(a)} />)}
           </Box>
 
-          {/* 月間パーフェクトで取ったメダル(習慣ごと・月ごと) */}
-          {category === 'month' && medals.length > 0 && (
-            <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto', mt: 1.5, pb: 0.5 }}>
-              {medals.map(m => (
-                <Box key={`${m.habit.id}-${m.year}-${m.month}`} sx={{ lineHeight: 0, flexShrink: 0 }} title={`${m.habit.name} ${m.year}年${m.month}月`}>
-                  <Medal color={m.habit.color} value={String(m.month)} unit="月" year={String(m.year)} />
-                </Box>
-              ))}
-            </Box>
-          )}
+          {/* 月間パーフェクトで取ったメダル(習慣ごと) */}
+          {category === 'month' && <MedalCase ctx={ctx} />}
         </Box>
       ))}
     </>
+  );
+}
+
+/** メダルケース: 習慣ごとに月間パーフェクトのメダルを棚に並べる(取りたては光る) */
+function MedalCase({ ctx }: { ctx: AchievementContext }) {
+  const theme = useTheme();
+  const gold = theme.palette.warning.main;
+  const rows = useMemo(
+    () => ctx.habits
+      .map(h => ({ habit: h.habit, medals: [...h.perfectMonths].sort((a, b) => b.year - a.year || b.month - a.month) }))
+      .filter(r => r.medals.length > 0)
+      .sort((a, b) => b.medals.length - a.medals.length),
+    [ctx],
+  );
+  if (rows.length === 0) return null;
+  const total = rows.reduce((n, r) => n + r.medals.length, 0);
+  const fresh = (year: number, month: number) => {
+    const end = new Date(year, month, 0);
+    const days = (ctx.today.getTime() - end.getTime()) / 86400000;
+    return days >= 0 && days <= FRESH_MEDAL_DAYS;
+  };
+
+  return (
+    <Box
+      sx={{
+        mt: 1.5, p: 1.5, pb: 1, borderRadius: 2, border: '1px solid', borderColor: alpha(gold, 0.35),
+        background: `linear-gradient(180deg, ${alpha(gold, 0.12)}, ${alpha(gold, 0.03)})`,
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 1 }}>
+        <Typography sx={{ fontWeight: 800, fontSize: '0.8rem' }}>メダルケース</Typography>
+        <Typography variant="caption" sx={{ color: 'text.secondary' }}>月の1日から末日まで毎日続けた証</Typography>
+        <Typography sx={{ ml: 'auto', fontWeight: 800, fontSize: '0.8rem', color: gold }}>計 {total}枚</Typography>
+      </Box>
+      {rows.map(r => (
+        <Box key={r.habit.id} sx={{ mb: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.5 }}>
+            <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: r.habit.color, flexShrink: 0 }} />
+            <Typography noWrap sx={{ fontSize: '0.78rem', fontWeight: 700, minWidth: 0 }}>{r.habit.name}</Typography>
+            <Typography sx={{ fontSize: '0.68rem', fontWeight: 700, color: 'text.secondary', flexShrink: 0 }}>{r.medals.length}枚</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, px: 0.5 }}>
+            {r.medals.map(m => {
+              const isFresh = fresh(m.year, m.month);
+              return (
+                <Box
+                  key={`${m.year}-${m.month}`}
+                  title={`${r.habit.name} ${m.year}年${m.month}月`}
+                  sx={{
+                    position: 'relative', lineHeight: 0,
+                    filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.35))',
+                    animation: isFresh ? `${medalGlow} 1.6s ease-in-out infinite` : undefined,
+                  }}
+                >
+                  <Medal color={r.habit.color} value={String(m.month)} unit="月" year={String(m.year)} size={52} shine />
+                  {isFresh && (
+                    <Box component="span" sx={{ position: 'absolute', top: 2, right: -6, px: 0.5, borderRadius: 1, bgcolor: 'error.main', color: '#fff', fontSize: '0.5rem', fontWeight: 800, lineHeight: 1.5 }}>
+                      NEW
+                    </Box>
+                  )}
+                </Box>
+              );
+            })}
+          </Box>
+          {/* 棚板 */}
+          <Box sx={{ height: 4, borderRadius: 2, mt: '2px', mx: 0.25, background: `linear-gradient(90deg, ${alpha(gold, 0.55)}, ${alpha(gold, 0.12)})`, boxShadow: `0 1px 0 ${alpha('#000', 0.25)}` }} />
+        </Box>
+      ))}
+    </Box>
   );
 }
 

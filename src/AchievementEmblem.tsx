@@ -5,6 +5,7 @@ import type { AchievementCategory, Tier } from './achievements';
 import { ICONS, METAL, SHAPE, type BadgeShape } from './achievementIcons';
 import { Trophy } from './Badges';
 import { FINISH } from './cardFinish';
+import type { Rarity } from './habitStats';
 
 // バッジの絵。カテゴリで形が、難しさ(tier)で縁の金属が変わる。
 // 取ったバッジは金属の縁にエナメルの面、金とプラチナは光が走る。
@@ -174,11 +175,13 @@ function Medallion({ badge, shape, earned, size, isNew }: { badge: BadgeLook; sh
   );
 }
 
-const RANK_NAME: Record<string, string> = { bronze: 'BRONZE', silver: 'SILVER', gold: 'GOLD', holo: 'HOLO' };
+const RANK_NAME: Record<string, string> = { bronze: 'BRONZE', silver: 'SILVER', gold: 'GOLD', platinum: 'PLATINUM', holo: 'HOLO' };
+/** 刻む文字の大きさ(PLATINUM のような長い名前は小さく) */
+const rankFont = (name: string, size: number) => size * (name.length > 6 ? 0.1 : 0.13);
 
 /** カードランクのバッジ: 本物のカードと同じ金属の、小さなカード */
 function MiniCard({ badge, earned, size, isNew }: { badge: BadgeLook; earned: boolean; size: number; isNew?: boolean }) {
-  const rarity = badge.icon.replace('rank-', '') as 'bronze' | 'silver' | 'gold' | 'holo';
+  const rarity = badge.icon.replace('rank-', '') as Exclude<Rarity, 'normal'>;
   const finish = FINISH[rarity];
   const w = size * 0.7;
   const h = size * 0.96;
@@ -186,7 +189,7 @@ function MiniCard({ badge, earned, size, isNew }: { badge: BadgeLook; earned: bo
     return (
       <Box sx={{ width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
         <Box sx={{ width: w, height: h, borderRadius: `${size * 0.09}px`, border: '1.6px dashed', borderColor: alpha(METAL[badge.tier].label, 0.6), bgcolor: 'rgba(128,128,128,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Box component="span" sx={{ fontSize: size * 0.13, fontWeight: 900, letterSpacing: '0.08em', color: 'text.disabled' }}>{RANK_NAME[rarity]}</Box>
+          <Box component="span" sx={{ fontSize: rankFont(RANK_NAME[rarity], size), fontWeight: 900, letterSpacing: '0.06em', color: 'text.disabled' }}>{RANK_NAME[rarity]}</Box>
         </Box>
       </Box>
     );
@@ -207,7 +210,7 @@ function MiniCard({ badge, earned, size, isNew }: { badge: BadgeLook; earned: bo
           },
         }}
       >
-        <Box component="span" sx={{ fontSize: size * 0.13, fontWeight: 900, letterSpacing: '0.06em', color: finish.ink, textShadow: finish.engrave }}>
+        <Box component="span" sx={{ fontSize: rankFont(RANK_NAME[rarity], size), fontWeight: 900, letterSpacing: '0.06em', color: finish.ink, textShadow: finish.engrave }}>
           {RANK_NAME[rarity]}
         </Box>
         <Box sx={{ width: '45%', height: 2, mt: 0.5, bgcolor: finish.line, boxShadow: `0 1px 0 ${finish.lineLight}` }} />

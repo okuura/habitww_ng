@@ -49,6 +49,13 @@ const STREAKS = svg(
   + `<rect width='100%' height='100%' filter='url(#s)'/>`,
   900, 300,
 );
+// くっきりした細いヘアライン(プラチナ用。BRUSHED より筋が細く、コントラストが強い)
+const HAIRLINE = svg(
+  `<filter id='h'><feTurbulence type='fractalNoise' baseFrequency='0.0004 1.6' numOctaves='3' seed='21' stitchTiles='stitch'/>`
+  + `<feColorMatrix values='2.2 0 0 0 -0.6  2.2 0 0 0 -0.6  2.2 0 0 0 -0.6  0 0 0 0 0.5'/></filter>`
+  + `<rect width='100%' height='100%' filter='url(#h)'/>`,
+  900, 300,
+);
 // ごく細かい粒(金属の地のざらつき)
 const GRAIN = svg(
   `<filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.6' numOctaves='1' seed='7' stitchTiles='stitch'/>`
@@ -63,9 +70,10 @@ const VIGNETTE = 'radial-gradient(130% 120% at 40% 45%, transparent 55%, rgba(0,
 
 const RAINBOW = 'linear-gradient(115deg, rgba(255,95,109,0.9), rgba(255,195,113,0.85), rgba(249,248,113,0.8), rgba(124,242,156,0.85), rgba(90,209,255,0.9), rgba(161,140,255,0.9), rgba(255,122,217,0.9), rgba(255,95,109,0.9))';
 
-function metal(base: string, rainbow = false) {
+function metal(base: string, { rainbow = false, hairline = false } = {}) {
   const layers: [string, string][] = [
     ...(rainbow ? [[`${RAINBOW} 0 0 / 300% 100%`, 'overlay'] as [string, string]] : []),
+    ...(hairline ? [[`${HAIRLINE} 0 0 / 900px 300px`, 'overlay'] as [string, string]] : []),
     [`${GRAIN} 0 0 / 200px 200px`, 'overlay'],
     [`${STREAKS} 0 0 / 900px 300px`, 'overlay'],
     [`${BRUSHED} 0 0 / 600px 300px`, 'overlay'],
@@ -82,17 +90,18 @@ function metal(base: string, rainbow = false) {
 
 export const FINISH: Record<Rarity, CardFinish | null> = {
   normal: null,
+  // 古びた青銅: 彩度を落とした渋い茶。暗い板なので刻印は明るい色
   bronze: {
     metal: true,
-    ...metal('linear-gradient(172deg, #7a4a22 0%, #b07440 14%, #dca06a 32%, #b5773f 50%, #d39560 68%, #a0652f 84%, #6f421d 100%)'),
-    ink: 'rgba(62,30,6,0.9)',
-    inkSub: 'rgba(62,30,6,0.72)',
-    engrave: '0 1px 0 rgba(255,214,175,0.45)',
-    panelBg: 'rgba(80,40,10,0.12)',
-    panelShadow: 'inset 0 1px 1px rgba(50,22,0,0.5), 0 1px 0 rgba(255,214,175,0.55)',
-    line: 'rgba(60,28,4,0.5)',
-    lineLight: 'rgba(255,214,175,0.6)',
-    sheen: 'linear-gradient(115deg, transparent 36%, rgba(255,228,200,0.45) 47%, rgba(255,255,255,0.12) 53%, transparent 64%)',
+    ...metal('linear-gradient(172deg, #3a2a1c 0%, #5c4530 14%, #86694c 32%, #64503a 50%, #7b6247 68%, #543e2a 84%, #31231a 100%)'),
+    ink: 'rgba(242,226,200,0.92)',
+    inkSub: 'rgba(242,226,200,0.72)',
+    engrave: '0 1px 1px rgba(0,0,0,0.6)',
+    panelBg: 'rgba(0,0,0,0.2)',
+    panelShadow: 'inset 0 1px 1px rgba(0,0,0,0.55), 0 1px 0 rgba(255,232,200,0.16)',
+    line: 'rgba(0,0,0,0.42)',
+    lineLight: 'rgba(255,232,200,0.2)',
+    sheen: 'linear-gradient(115deg, transparent 36%, rgba(255,228,200,0.3) 47%, rgba(255,255,255,0.08) 53%, transparent 64%)',
   },
   silver: {
     metal: true,
@@ -106,21 +115,35 @@ export const FINISH: Record<Rarity, CardFinish | null> = {
     lineLight: 'rgba(255,255,255,0.75)',
     sheen: 'linear-gradient(115deg, transparent 36%, rgba(255,255,255,0.45) 47%, rgba(255,255,255,0.12) 53%, transparent 64%)',
   },
+  // 重厚な金: 縁は深い琥珀、中央だけ明るく。黄色く飛ばさない
   gold: {
     metal: true,
-    ...metal('linear-gradient(172deg, #a87508 0%, #d8a823 14%, #f4d659 32%, #d9ad26 50%, #efcc48 68%, #c8961b 84%, #9a6a05 100%)'),
-    ink: 'rgba(84,52,0,0.9)',
-    inkSub: 'rgba(84,52,0,0.72)',
-    engrave: '0 1px 0 rgba(255,244,190,0.5)',
-    panelBg: 'rgba(110,78,8,0.12)',
-    panelShadow: 'inset 0 1px 1px rgba(80,52,0,0.5), 0 1px 0 rgba(255,244,196,0.7)',
-    line: 'rgba(84,56,0,0.5)',
-    lineLight: 'rgba(255,246,200,0.75)',
-    sheen: 'linear-gradient(115deg, transparent 36%, rgba(255,248,215,0.5) 47%, rgba(255,255,255,0.15) 53%, transparent 64%)',
+    ...metal('linear-gradient(172deg, #462d04 0%, #8a5f0e 14%, #d3a93d 32%, #97711a 50%, #c3992f 68%, #7b550b 84%, #3c2503 100%)'),
+    ink: 'rgba(58,34,0,0.92)',
+    inkSub: 'rgba(58,34,0,0.74)',
+    engrave: '0 1px 0 rgba(255,232,170,0.45)',
+    panelBg: 'rgba(80,52,0,0.16)',
+    panelShadow: 'inset 0 1px 1px rgba(60,36,0,0.55), 0 1px 0 rgba(255,232,170,0.55)',
+    line: 'rgba(60,36,0,0.5)',
+    lineLight: 'rgba(255,236,180,0.6)',
+    sheen: 'linear-gradient(115deg, transparent 36%, rgba(255,240,190,0.5) 47%, rgba(255,255,255,0.14) 53%, transparent 64%)',
+  },
+  // プラチナ: 白に近い無彩色の板に、細いヘアラインがくっきり入る
+  platinum: {
+    metal: true,
+    ...metal('linear-gradient(172deg, #c4c5c3 0%, #e9eae8 16%, #ffffff 34%, #d8d9d7 52%, #f6f6f5 70%, #e2e3e1 86%, #b9bab8 100%)', { hairline: true }),
+    ink: 'rgba(44,46,52,0.9)',
+    inkSub: 'rgba(44,46,52,0.7)',
+    engrave: '0 1px 0 rgba(255,255,255,0.7)',
+    panelBg: 'rgba(40,42,50,0.1)',
+    panelShadow: 'inset 0 1px 1px rgba(20,22,28,0.4), 0 1px 0 rgba(255,255,255,0.85)',
+    line: 'rgba(44,46,52,0.4)',
+    lineLight: 'rgba(255,255,255,0.85)',
+    sheen: 'linear-gradient(115deg, transparent 34%, rgba(255,255,255,0.55) 46%, rgba(220,225,235,0.25) 52%, transparent 64%)',
   },
   holo: {
     metal: true,
-    ...metal('linear-gradient(172deg, #a7aebb 0%, #e3e6ec 18%, #fafbfc 36%, #cfd4dc 54%, #eef0f4 72%, #aeb5c1 100%)', true),
+    ...metal('linear-gradient(172deg, #a7aebb 0%, #e3e6ec 18%, #fafbfc 36%, #cfd4dc 54%, #eef0f4 72%, #aeb5c1 100%)', { rainbow: true }),
     ink: 'rgba(40,32,90,0.88)',
     inkSub: 'rgba(40,32,90,0.7)',
     engrave: '0 1px 0 rgba(255,255,255,0.55)',

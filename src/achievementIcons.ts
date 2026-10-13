@@ -25,9 +25,10 @@ import CelebrationIcon from '@mui/icons-material/Celebration';
 export const ICONS: Record<string, { Icon: SvgIconComponent; color: string }> = {
   fire: { Icon: LocalFireDepartmentIcon, color: '#f4511e' },
   trophy: { Icon: EmojiEventsIcon, color: '#e09b00' },
-  'rank-bronze': { Icon: StyleIcon, color: '#b8743d' },
+  'rank-bronze': { Icon: StyleIcon, color: '#86694c' },
   'rank-silver': { Icon: StyleIcon, color: '#8e99a8' },
-  'rank-gold': { Icon: StyleIcon, color: '#d4a017' },
+  'rank-gold': { Icon: StyleIcon, color: '#b8860b' },
+  'rank-platinum': { Icon: StyleIcon, color: '#a9aaa8' },
   'rank-holo': { Icon: StyleIcon, color: '#8c7cf0' },
   calendar: { Icon: CalendarMonthIcon, color: '#1e88e5' },
   spring: { Icon: LocalFloristIcon, color: '#ec6f9a' },

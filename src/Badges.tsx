@@ -4,8 +4,10 @@ import { alpha, darken, lighten } from '@mui/material/styles';
 // 実績のバッジ図鑑と習慣カードの裏面で使う、メダルとトロフィーの絵
 
 // --- Medal (SVG) -----------------------------------------------------------
-// A ribbon-and-disc medal. `value`+`unit` engraved in the center, `year`
-// stamped below it. `ongoing` renders a dashed "not yet earned" ghost.
+// 月間パーフェクトのメダル。金の縁の中に習慣の色のエナメル、中央に月、下に年号。
+// `shine` で光が走る(SMIL。iOS でも動く)。`ongoing` は点線の「まだ」の姿
+
+const MEDAL_GOLD = ['#fff6c8', '#f2c94c', '#c48a10', '#ffe58a', '#8a5c08'];
 
 interface MedalProps {
   color: string;
@@ -14,44 +16,72 @@ interface MedalProps {
   year?: string;
   ribbonColor?: string;
   ongoing?: boolean;
+  /** 幅(px)。高さは 62/48 倍 */
+  size?: number;
+  /** 光を走らせる */
+  shine?: boolean;
 }
 
-export function Medal({ color, value, unit, year, ribbonColor, ongoing }: MedalProps) {
+export function Medal({ color, value, unit, year, ribbonColor, ongoing, size = 40, shine = false }: MedalProps) {
   const gid = useId();
-  const rim = darken(color, 0.35);
   const ribbon = ribbonColor ?? darken(color, 0.18);
   const ribbonLight = ribbonColor ? lighten(ribbonColor, 0.15) : darken(color, 0.05);
-  const valueSize = value.length >= 4 ? 10.5 : value.length === 3 ? 12 : 14;
+  const valueSize = value.length >= 4 ? 9.5 : value.length === 3 ? 11 : 13;
 
   return (
-    <svg width={40} height={52} viewBox="0 0 48 62" aria-hidden focusable="false">
+    <svg width={size} height={size * 62 / 48} viewBox="0 0 48 62" aria-hidden focusable="false">
       {!ongoing && (
         <>
-          {/* Ribbon straps */}
+          {/* リボン */}
           <polygon points="13,0 22,0 27,24 18,27" fill={ribbon} />
           <polygon points="26,0 35,0 30,27 21,24" fill={ribbonLight} />
           <defs>
+            <linearGradient id={`${gid}-r`} x1="0" y1="0" x2="1" y2="1">
+              {MEDAL_GOLD.map((c, i) => <stop key={i} offset={`${(i / (MEDAL_GOLD.length - 1)) * 100}%`} stopColor={c} />)}
+            </linearGradient>
             <linearGradient id={`${gid}-m`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={lighten(color, 0.3)} />
               <stop offset="55%" stopColor={color} />
               <stop offset="100%" stopColor={darken(color, 0.28)} />
             </linearGradient>
+            <linearGradient id={`${gid}-s`} x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="rgba(255,255,255,0)" />
+              <stop offset="50%" stopColor="rgba(255,255,255,0.7)" />
+              <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+            </linearGradient>
+            <clipPath id={`${gid}-c`}><circle cx={24} cy={40} r={20.5} /></clipPath>
           </defs>
-          {/* Disc */}
-          <circle cx={24} cy={40} r={19} fill={`url(#${gid}-m)`} stroke={rim} strokeWidth={1.5} />
-          {/* Engraved inner ring */}
-          <circle cx={24} cy={40} r={15.5} fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth={1} />
-          {/* Gloss highlight */}
-          <ellipse cx={17.5} cy={32} rx={9} ry={4.5} fill="rgba(255,255,255,0.22)" transform="rotate(-24 17.5 32)" />
-          {/* Value */}
-          <text x={24} y={41.5} textAnchor="middle" fontWeight={800} fontSize={valueSize} fill="#fff">
+          {/* 金の縁 */}
+          <circle cx={24} cy={40} r={20.5} fill={`url(#${gid}-r)`} stroke="#6b4500" strokeWidth={0.8} />
+          {/* エナメルの面 */}
+          <circle cx={24} cy={40} r={16.5} fill={`url(#${gid}-m)`} stroke={darken(color, 0.4)} strokeWidth={0.8} />
+          {/* 彫った内側の輪 */}
+          <circle cx={24} cy={40} r={14} fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth={0.8} />
+          {/* 映り込み */}
+          <ellipse cx={18.5} cy={33} rx={7.5} ry={3.8} fill="rgba(255,255,255,0.22)" transform="rotate(-24 18.5 33)" />
+          {/* 月 */}
+          <text x={24} y={41.5} textAnchor="middle" fontWeight={800} fontSize={valueSize} fill="rgba(0,0,0,0.35)">
             {value}
-            <tspan fontSize={7} fontWeight={700}>{unit}</tspan>
+            <tspan fontSize={6.5} fontWeight={700}>{unit}</tspan>
+          </text>
+          <text x={24} y={40.8} textAnchor="middle" fontWeight={800} fontSize={valueSize} fill="#fff">
+            {value}
+            <tspan fontSize={6.5} fontWeight={700}>{unit}</tspan>
           </text>
           {year && (
-            <text x={24} y={50} textAnchor="middle" fontWeight={600} fontSize={6} fill="rgba(255,255,255,0.85)" letterSpacing={0.5}>
+            <text x={24} y={49} textAnchor="middle" fontWeight={700} fontSize={5.5} fill="rgba(255,255,255,0.9)" letterSpacing={0.5}>
               {year}
             </text>
+          )}
+          {/* 光が走る */}
+          {shine && (
+            <g clipPath={`url(#${gid}-c)`}>
+              <g transform="skewX(-18)">
+                <rect y={18} width={8} height={46} fill={`url(#${gid}-s)`}>
+                  <animate attributeName="x" values="-16;72;72" keyTimes="0;0.3;1" dur="4.5s" repeatCount="indefinite" />
+                </rect>
+              </g>
+            </g>
           )}
         </>
       )}
