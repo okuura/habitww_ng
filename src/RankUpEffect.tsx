@@ -17,9 +17,9 @@ export interface RankUp {
 
 const NAME: Record<RankUp['rarity'], string> = { bronze: 'BRONZE', silver: 'SILVER', gold: 'GOLD', platinum: 'PLATINUM', holo: 'HOLO' };
 const ACCENT: Record<RankUp['rarity'], string[]> = {
-  bronze: ['#b4916a', '#7b5f42', '#e0c8a8'],
+  bronze: ['#c98a52', '#8e5a2e', '#ffd9b8'],
   silver: ['#ffffff', '#c9d0da', '#9aa5b4'],
-  gold: ['#d3a93d', '#97711a', '#ffe9a8'],
+  gold: ['#d9bf76', '#a3823c', '#fff4d0'],
   platinum: ['#ffffff', '#e6e7e5', '#b9bab8'],
   holo: ['#ff5f6d', '#ffc371', '#7cf29c', '#5ad1ff', '#a18cff', '#ff7ad9'],
 };
