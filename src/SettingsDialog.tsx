@@ -2,20 +2,14 @@ import { forwardRef, useRef, useState, type ReactElement, type ReactNode, type R
 import Slide from '@mui/material/Slide';
 import type { TransitionProps } from '@mui/material/transitions';
 import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import DialogContentText from '@mui/material/DialogContentText';
-import DialogActions from '@mui/material/DialogActions';
-import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
 import InputBase from '@mui/material/InputBase';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
-import KeyIcon from '@mui/icons-material/Key';
 import { useTheme } from '@mui/material/styles';
-import type { AuthError, PasskeyListItem, User } from '@supabase/supabase-js';
-import { browserHasPasskeys, supabase, userDisplayName, userEmblem } from './supabase';
+import type { AuthError, User } from '@supabase/supabase-js';
+import { supabase, userDisplayName, userEmblem } from './supabase';
 import type { EvaluatedAchievement } from './achievements';
 import AchievementEmblem from './AchievementEmblem';
 import NameEmblem from './NameEmblem';
@@ -41,11 +35,6 @@ interface SettingsDialogProps {
 
 const MAX_NAME = 30;
 
-/** パスキーの一覧の状態。'disabled' は Supabase 側で無効、'unsupported' はこのブラウザが非対応 */
-type PasskeyState = 'loading' | 'ok' | 'disabled' | 'unsupported' | 'error';
-
-const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('ja-JP', { year: 'numeric', month: 'numeric', day: 'numeric' });
-
 export default function SettingsDialog({ open, onClose, user, dark, earnedBadges, onUserUpdated, onSignOut, onDeleteAccount }: SettingsDialogProps) {
   const theme = useTheme();
   const savedName = userDisplayName(user) ?? '';
@@ -55,61 +44,8 @@ export default function SettingsDialog({ open, onClose, user, dark, earnedBadges
   const [emblem, setEmblem] = useState<string | null>(userEmblem(user));
   const [emblemError, setEmblemError] = useState<string | null>(null);
 
-  const [passkeys, setPasskeys] = useState<PasskeyListItem[]>([]);
-  const [passkeyState, setPasskeyState] = useState<PasskeyState>('loading');
-  const [passkeyBusy, setPasskeyBusy] = useState(false);
-  const [passkeyMsg, setPasskeyMsg] = useState<{ text: string; error: boolean } | null>(null);
-  const [passkeyToDelete, setPasskeyToDelete] = useState<PasskeyListItem | null>(null);
-
-  // 登録済みのパスキー。Supabase 側で無効なら 'disabled'(ダッシュボードの Authentication → Passkeys)
-  const loadPasskeys = async () => {
-    if (!browserHasPasskeys()) { setPasskeyState('unsupported'); return; }
-    setPasskeyState('loading');
-    const { data, error } = await supabase.auth.passkey.list();
-    if (error) {
-      setPasskeyState(error.code === 'passkey_disabled' || error.status === 404 ? 'disabled' : 'error');
-      return;
-    }
-    setPasskeys(data ?? []);
-    setPasskeyState('ok');
-  };
-
-  // この端末のパスキーを登録(Face ID・Touch ID・指紋・パスワードマネージャーなど)
-  const registerPasskey = async () => {
-    if (passkeyBusy) return;
-    setPasskeyBusy(true);
-    setPasskeyMsg(null);
-    const { data, error } = await supabase.auth.registerPasskey();
-    setPasskeyBusy(false);
-    if (error || !data) {
-      const code = (error as { code?: string } | null)?.code;
-      if (code === 'ERROR_CEREMONY_ABORTED') return; // 自分でやめた
-      const text = code === 'webauthn_credential_exists' || code === 'ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED'
-        ? 'この端末のパスキーはすでに登録されています'
-        : code === 'too_many_passkeys'
-          ? 'これ以上パスキーを登録できません'
-          : `パスキーを登録できませんでした(${error?.message || '不明なエラー'})`;
-      setPasskeyMsg({ text, error: true });
-      return;
-    }
-    setPasskeyMsg({ text: '登録しました。次からパスキーでログインできます', error: false });
-    await loadPasskeys();
-  };
-
-  const deletePasskey = async (pk: PasskeyListItem) => {
-    setPasskeyToDelete(null);
-    setPasskeyMsg(null);
-    const { error } = await supabase.auth.passkey.delete({ passkeyId: pk.id });
-    if (error) { setPasskeyMsg({ text: `削除できませんでした(${error.message})`, error: true }); return; }
-    setPasskeys(prev => prev.filter(p => p.id !== pk.id));
-  };
-
   // 開くたびに保存済みの名前から始める
-  const reset = () => {
-    setName(userDisplayName(user) ?? ''); setStatus('idle'); setEmblem(userEmblem(user)); setEmblemError(null);
-    setPasskeyMsg(null); setPasskeyToDelete(null);
-    void loadPasskeys();
-  };
+  const reset = () => { setName(userDisplayName(user) ?? ''); setStatus('idle'); setEmblem(userEmblem(user)); setEmblemError(null); };
 
   // 名前の横のバッジ: アカウントに保存し、Cowork の自分の行にも書く(仲間に見えるように)
   const saveEmblem = async (id: string | null) => {
@@ -308,43 +244,6 @@ export default function SettingsDialog({ open, onClose, user, dark, earnedBadges
           </Box>
         </Section>
 
-        {passkeyState !== 'unsupported' && (
-          <Section
-            c={c}
-            header="パスキー"
-            footer={
-              passkeyMsg
-                ? <Box component="span" sx={passkeyMsg.error ? { color: 'error.main' } : undefined}>{passkeyMsg.text}</Box>
-                : passkeyState === 'disabled'
-                  ? 'パスキーはまだ使えるようになっていません'
-                  : passkeyState === 'error'
-                    ? 'パスキーの一覧を読み込めませんでした'
-                    : 'この端末の Face ID・Touch ID・指紋などで、次からすぐログインできます'
-            }
-          >
-            {passkeys.map((pk, i) => (
-              <Row key={pk.id} c={c} divider={i > 0}>
-                <KeyIcon sx={{ fontSize: 22, color: c.sub, transform: 'rotate(-45deg)', mr: 1.5, flexShrink: 0 }} />
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography noWrap sx={{ fontSize: '1.0625rem' }}>{pk.friendly_name || 'パスキー'}</Typography>
-                  <Typography noWrap sx={{ fontSize: '0.8125rem', color: c.sub }}>
-                    {fmtDate(pk.created_at)} に登録{pk.last_used_at ? ` · 最終 ${fmtDate(pk.last_used_at)}` : ''}
-                  </Typography>
-                </Box>
-                <ButtonBase onClick={() => setPasskeyToDelete(pk)} sx={{ ml: 1.5, px: 1, py: 0.5, borderRadius: 1, fontSize: '0.9375rem', color: 'error.main', flexShrink: 0 }}>
-                  削除
-                </ButtonBase>
-              </Row>
-            ))}
-            {passkeyState !== 'disabled' && (
-              <Row c={c} divider={passkeys.length > 0} onClick={passkeyState === 'ok' && !passkeyBusy ? registerPasskey : undefined}>
-                <Typography sx={{ fontSize: '1.0625rem', color: passkeyState === 'ok' ? accent : c.sub }}>この端末のパスキーを登録</Typography>
-                {(passkeyBusy || passkeyState === 'loading') && <CircularProgress size={14} sx={{ ml: 1.5, color: c.sub }} />}
-              </Row>
-            )}
-          </Section>
-        )}
-
         <Section c={c}>
           <Row c={c} onClick={onSignOut}>
             <Typography sx={{ fontSize: '1.0625rem', color: accent }}>ログアウト</Typography>
@@ -368,19 +267,6 @@ export default function SettingsDialog({ open, onClose, user, dark, earnedBadges
           </ButtonBase>
         </Box>
       </Box>
-
-      <Dialog open={!!passkeyToDelete} onClose={() => setPasskeyToDelete(null)} PaperProps={{ sx: { borderRadius: 3, m: 2 } }}>
-        <DialogTitle>パスキーを削除</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            「{passkeyToDelete?.friendly_name || 'パスキー'}」を削除します。この端末からはパスキーでログインできなくなります(端末側のパスキーは残るので、不要なら端末の設定からも消してください)。
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPasskeyToDelete(null)}>やめる</Button>
-          <Button color="error" variant="contained" onClick={() => passkeyToDelete && deletePasskey(passkeyToDelete)}>削除</Button>
-        </DialogActions>
-      </Dialog>
     </Dialog>
   );
 }

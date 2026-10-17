@@ -152,30 +152,6 @@ redirectTo: window.location.origin })` → Google 同意画面 →
 
 - X はメールアドレスを返さないことが多いため、基本的に Google とは別アカウントになる
 
-### 認証(パスキー)
-
-ログイン画面の「パスキーで続ける」と、設定の「パスキー」(登録・一覧・削除)。
-Supabase Auth のパスキー(WebAuthn)機能を使う。supabase-js では実験的 API なので
-`createClient` に `auth: { experimental: { passkey: true } }` を渡して有効にしている(`src/supabase.ts`)。
-
-流れ: Google / X でログイン済みのユーザーが設定で「この端末のパスキーを登録」
-(`auth.registerPasskey()`。端末の Face ID / Touch ID / 指紋 / パスワードマネージャーに保存)→
-次回からログイン画面の「パスキーで続ける」(`auth.signInWithPasskey()`。ディスカバラブル資格情報なので
-メールアドレスの入力は無い)。パスキーは既存アカウントに紐づくだけで、新しいアカウントは作らない。
-
-| 設定箇所 | 内容 |
-|---|---|
-| Supabase → Authentication → Passkeys | **Enable Passkey authentication** をオン |
-| 同上 → Relying Party Display Name | `Habitww`(端末のパスキーのダイアログに出る名前) |
-| 同上 → Relying Party ID | `habitww.pacelong.life`(スキーム・ポート・パス無しのドメイン。**あとから変えると登録済みのパスキーが全部使えなくなる**) |
-| 同上 → Relying Party Origins | `https://habitww.pacelong.life`(最大 5 つ、カンマ区切り。HTTPS 必須、localhost だけ例外。開発で使うなら `http://localhost:5173` も) |
-
-- 有効になるまでは、ログイン画面にボタンを出さない(`GET /auth/v1/settings` の `passkeys_enabled` を見る)。
-  設定の「パスキー」は「まだ使えるようになっていません」と出る
-- 1 つの端末(認証器)につき 1 つ。同じ端末でもう一度登録しようとすると「すでに登録されています」
-- iOS アプリ(habitww-ios)で使うには、WKWebView 内の WebAuthn が RP ID のドメインと紐づく必要がある
-  (Associated Domains の `webcredentials:habitww.pacelong.life`)。未設定なら Safari / Chrome からだけ使える
-
 ## ローカル開発
 
 ```bash
