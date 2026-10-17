@@ -14,6 +14,7 @@ import {
 import AchievementEmblem from './AchievementEmblem';
 import { emblemColor, METAL } from './achievementIcons';
 import { Medal } from './Badges';
+import { habitEndedAt } from './habitStats';
 import { alpha, keyframes, useTheme } from '@mui/material/styles';
 
 // バッジ図鑑(実績ページ)。集めた数と最近のバッジ、その下にカテゴリごとの全部のバッジを並べる。
@@ -256,23 +257,25 @@ function MedalCase({ ctx }: { ctx: AchievementContext }) {
   const thisYear = ctx.today.getFullYear();
   const nowKey = thisYear * 12 + ctx.today.getMonth();
   const [year, setYear] = useState(thisYear);
-  const minYear = Math.min(thisYear, ...ctx.habits.map(h => new Date(h.habit.created_at).getFullYear()));
+  // 削除した習慣はメダルの行に出さない(バッジの判定にだけ使う)
+  const shown = ctx.habits.filter(h => !h.habit.deleted_at);
+  const minYear = Math.min(thisYear, ...shown.map(h => new Date(h.habit.created_at).getFullYear()));
   const years = Array.from({ length: thisYear - minYear + 1 }, (_, i) => minYear + i);
-  const total = ctx.habits.reduce((n, h) => n + h.perfectMonths.length, 0);
+  const total = shown.reduce((n, h) => n + h.perfectMonths.length, 0);
   const rows = useMemo(
-    () => ctx.habits
+    () => shown
       .map(h => {
         const created = new Date(h.habit.created_at);
         // 月の途中で作った習慣は、その月のメダルは取れないので翌月から数える
         const createdKey = created.getFullYear() * 12 + created.getMonth() + (created.getDate() === 1 ? 0 : 1);
         // アーカイブした習慣は、その月より後の枠を出さない
-        const archivedAt = h.habit.archived_at ? new Date(h.habit.archived_at) : null;
-        const archivedKey = archivedAt && !Number.isNaN(archivedAt.getTime()) ? archivedAt.getFullYear() * 12 + archivedAt.getMonth() : null;
+        const endedAt = habitEndedAt(h.habit);
+        const archivedKey = endedAt ? endedAt.getFullYear() * 12 + endedAt.getMonth() : null;
         return { h, createdKey, archivedKey, months: new Set(h.perfectMonths.filter(m => m.year === year).map(m => m.month)) };
       })
       .filter(r => r.createdKey <= year * 12 + 11 && (r.archivedKey === null || r.archivedKey >= year * 12))
       .sort((a, b) => b.months.size - a.months.size || a.h.habit.name.localeCompare(b.h.habit.name)),
-    [ctx, year],
+    [shown, year],
   );
   if (rows.length === 0) return null;
   const fresh = (y: number, m: number) => {

@@ -99,6 +99,8 @@ SQL Editor で実行するか、`npx supabase link` → `npx supabase db push`�
    アプリは応援の機能ごと隠す(行をタップしても何も起きない)
 5. 習慣のアーカイブは `habits.archived_at`(`20261019000000_add_habit_archived.sql`)。列が無いと
    アーカイブの `update` だけが失敗してスナックバーが出る(ほかは動く)
+6. 習慣の削除は論理削除 `habits.deleted_at`(`20261020000000_add_habit_deleted.sql`)。列が無いと
+   削除が失敗してスナックバーが出る(物理削除にはフォールバックしない)
 
 ### 認証(Google OAuth)
 

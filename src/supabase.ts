@@ -114,6 +114,7 @@ export interface Habit {
   notify_enabled?: boolean; // 実施時間に通知する(iOS アプリ版のみ)
   sort_order?: number; // 表示順(小さい順)
   archived_at?: string | null; // アーカイブした時刻。null/undefined なら現役(記録画面に出る)
+  deleted_at?: string | null; // 論理削除した時刻。付いていれば画面には出さないが、記録は実績の判定に使う
 }
 
 export interface HabitCompletion {

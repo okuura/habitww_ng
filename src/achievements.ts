@@ -1,5 +1,5 @@
 import type { Habit, HabitCompletion } from './supabase';
-import { computeHabitBadges, rarityOf, RARITY_TIERS, toLocalDateString, type MonthBadge, type Rarity } from './habitStats';
+import { computeHabitBadges, rarityOf, RARITY_TIERS, toLocalDateString, type MonthBadge, type Rarity, habitEndedAt } from './habitStats';
 
 // 実績ページのバッジ図鑑と「もうすぐ取れる」の計算(UI を持たない純粋な関数)。
 // どのバッジも過去の記録から判定するので、機能を入れる前の分も遡って取れる
@@ -107,7 +107,7 @@ export function buildContext(habits: Habit[], completions: HabitCompletion[], no
 
   // パーフェクトデイ: その日にあった習慣(作った日以降、アーカイブした日より前)を全部実施した日
   const created = data.map(h => toLocalDateString(new Date(h.habit.created_at)));
-  const archived = data.map(h => (h.habit.archived_at ? toLocalDateString(new Date(h.habit.archived_at)) : null));
+  const archived = data.map(h => { const end = habitEndedAt(h.habit); return end ? toLocalDateString(end) : null; });
   const days = new Set(mine.map(c => c.completed_date));
   const perfectDays = [...days].sort().filter(ds => {
     let existing = 0;

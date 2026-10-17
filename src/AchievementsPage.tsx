@@ -30,12 +30,14 @@ export default function AchievementsPage({ habits, completions }: AchievementsPa
   // おもちゃ箱に入れるもの: 取ったバッジと、習慣ごとの月間メダル
   const toys = useMemo(() => ({
     badges: achievements.evaluated.filter(a => a.state.earned),
-    medals: achievements.ctx.habits.flatMap(h => h.perfectMonths.map(m => ({ habit: h.habit, year: m.year, month: m.month }))),
+    medals: achievements.ctx.habits.filter(h => !h.habit.deleted_at).flatMap(h => h.perfectMonths.map(m => ({ habit: h.habit, year: m.year, month: m.month }))),
   }), [achievements]);
+  // 削除した習慣は「これまでの実績」のドットには出さない(バッジの判定にだけ使う)
+  const shownHabits = useMemo(() => habits.filter(h => !h.deleted_at), [habits]);
   const [toyOpen, setToyOpen] = useState(false);
   const hasToys = toys.badges.length + toys.medals.length > 0;
 
-  if (habits.length === 0) {
+  if (shownHabits.length === 0) {
     return (
       <Container maxWidth="md" sx={{ py: { xs: 2, sm: 3 }, px: { xs: 1.5, sm: 3 } }}>
         <Box sx={{ textAlign: 'center', py: 8 }}>
@@ -56,7 +58,7 @@ export default function AchievementsPage({ habits, completions }: AchievementsPa
         sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2, overflow: 'visible' }}
       >
         <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-          <AchievementDots habits={habits} completions={completions} />
+          <AchievementDots habits={shownHabits} completions={completions} />
         </CardContent>
       </Card>
 

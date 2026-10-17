@@ -675,12 +675,14 @@ function AppContent() {
   );
   const completedToday = new Set(todayIntensity.keys());
 
-  // 記録画面に出す習慣(アーカイブしていないもの)と、アーカイブした習慣(新しい順)。
-  // 実績・統計・キャッシュには全部(habits)を渡す
-  const activeHabits = useMemo(() => habits.filter(h => !h.archived_at), [habits]);
+  // habits には論理削除した習慣も入っている(記録を実績の判定に使い続けるため)。
+  // visibleHabits = 削除していない習慣(統計・アーカイブ一覧)、activeHabits = さらにアーカイブもしていない(記録画面)。
+  // 実績の判定(buildContext)とキャッシュには全部(habits)を渡す
+  const visibleHabits = useMemo(() => habits.filter(h => !h.deleted_at), [habits]);
+  const activeHabits = useMemo(() => visibleHabits.filter(h => !h.archived_at), [visibleHabits]);
   const archivedHabits = useMemo(
-    () => habits.filter(h => !!h.archived_at).sort((a, b) => (b.archived_at ?? '').localeCompare(a.archived_at ?? '')),
-    [habits],
+    () => visibleHabits.filter(h => !!h.archived_at).sort((a, b) => (b.archived_at ?? '').localeCompare(a.archived_at ?? '')),
+    [visibleHabits],
   );
 
   const completionsByHabit = new Map<string, Map<string, number>>();
@@ -1027,10 +1029,19 @@ function AppContent() {
     </>
   );
 
+  /** 削除は論理削除: deleted_at を付けて画面から外す。記録は残り、これまでのバッジ・メダルは消えない。
+   *  Cowork のグループ登録だけは本当に外す(今までの物理削除では CASCADE で消えていた) */
   const handleDeleteHabit = async () => {
-    if (!deleteHabitTarget) return;
-    await supabase.from('habits').delete().eq('id', deleteHabitTarget);
+    const id = deleteHabitTarget;
+    if (!id) return;
     setDeleteHabitTarget(null);
+    const { error } = await supabase.from('habits').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+    if (error) {
+      setSnackbarMsg('削除できませんでした');
+      return;
+    }
+    await supabase.from('cowork_members').delete().eq('habit_id', id);
+    vibrate(10);
     await fetchData();
   };
 
@@ -1527,7 +1538,7 @@ function AppContent() {
 
         {page === 'stats' && (
           <Suspense fallback={<StatsPageSkeleton />}>
-            <StatsPage habits={habits} completions={completions} />
+            <StatsPage habits={visibleHabits} completions={completions} />
           </Suspense>
         )}
 
@@ -1732,7 +1743,7 @@ function AppContent() {
         <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>習慣の削除</DialogTitle>
         <DialogContent>
           <DialogContentText sx={{ color: 'text.secondary' }}>
-            この習慣を削除します。記録を含めて削除されますが、本当に削除してよろしいですか？
+            この習慣を削除します。これまでに取ったバッジやメダルは残ります。本当に削除してよろしいですか？
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>

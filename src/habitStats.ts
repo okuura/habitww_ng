@@ -21,17 +21,25 @@ export interface HabitBadges {
   bestStreak: number;
 }
 
+/** 習慣が終わった日(アーカイブか削除の早い方)。無ければ null。実績の判定で「その日以降は無い習慣」として扱う */
+export function habitEndedAt(habit: Pick<Habit, 'archived_at' | 'deleted_at'>): Date | null {
+  const stamps = [habit.archived_at, habit.deleted_at].filter((s): s is string => !!s).map(s => new Date(s)).filter(d => !Number.isNaN(d.getTime()));
+  if (stamps.length === 0) return null;
+  const d = new Date(Math.min(...stamps.map(s => s.getTime())));
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
 export function computeHabitBadges(habit: Habit, dates: Set<string>, today: Date): HabitBadges {
   const todayStr = toLocalDateString(today);
 
   const created = new Date(habit.created_at);
   created.setHours(0, 0, 0, 0);
 
-  // アーカイブした習慣は、アーカイブした日で終わった扱い(その日までを判定し、進行中にはしない)
-  const archivedAt = habit.archived_at ? new Date(habit.archived_at) : null;
-  if (archivedAt) archivedAt.setHours(0, 0, 0, 0);
-  const isArchived = archivedAt !== null && !Number.isNaN(archivedAt.getTime());
-  const limit = isArchived && archivedAt! < today ? archivedAt! : today;
+  // アーカイブ・削除した習慣は、その日で終わった扱い(その日までを判定し、進行中にはしない)
+  const endedAt = habitEndedAt(habit);
+  const isArchived = endedAt !== null;
+  const limit = endedAt && endedAt < today ? endedAt : today;
   const limitStr = toLocalDateString(limit);
 
   const perfectMonths: MonthBadge[] = [];
