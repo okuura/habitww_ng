@@ -9,8 +9,8 @@ import { keyframes } from '@emotion/react';
 import type { Provider } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 
-// ログイン画面: 画面全体のやわらかいグラデーションと漂うぼかし円の上に、すりガラスのカード。
-// 文字は「Habitww」と一言だけ。ログインの流れ(signInWithOAuth)は変えない
+// ログイン画面: 画面全体のやわらかいグラデーションと漂うぼかし円の上に、アプリアイコン・Habitww・一言・ボタン。
+// カードは置かない。ログインの流れ(signInWithOAuth)は変えない
 
 const GOOGLE_ICON = (
   <Box component="svg" viewBox="0 0 24 24" sx={{ width: 20, height: 20, flexShrink: 0 }}>
@@ -63,15 +63,6 @@ const LOGIN_PROVIDERS: { provider: Provider; label: string; icon: ReactNode; ena
   { provider: 'x', label: 'X で続ける', icon: X_ICON, enabled: true },
 ];
 
-/** アプリアイコンと同じ「芽」(白) */
-const SPROUT = (
-  <Box component="svg" viewBox="0 0 48 48" sx={{ width: 38, height: 38 }}>
-    <path d="M24 42V22" stroke="#fff" strokeWidth="4" strokeLinecap="round" fill="none" />
-    <path d="M24 26c-1-8-7-12-15-12 0 8 5 13 15 12z" fill="#fff" />
-    <path d="M24 20c1-8 8-12 16-11 0 8-6 13-16 11z" fill="#fff" opacity="0.92" />
-  </Box>
-);
-
 const fadeUp = keyframes`
   from { opacity: 0; transform: translateY(16px) scale(0.98); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
@@ -116,10 +107,6 @@ export default function LoginPage() {
     if (error) { setLoading(null); setFailed(true); }
   };
 
-  const glass = dark
-    ? { bg: 'rgba(18,28,24,0.6)', border: 'rgba(255,255,255,0.08)', shadow: '0 24px 60px rgba(0,0,0,0.45)' }
-    : { bg: 'rgba(255,255,255,0.62)', border: 'rgba(255,255,255,0.55)', shadow: '0 24px 60px rgba(20,60,40,0.18)' };
-
   return (
     <Box
       sx={{
@@ -146,35 +133,24 @@ export default function LoginPage() {
         />
       ))}
 
-      {/* すりガラスのカード */}
-      <Box
-        sx={{
-          position: 'relative', width: 'min(100%, 400px)', p: { xs: 3.5, sm: 4 }, borderRadius: '28px',
-          bgcolor: glass.bg, border: `1px solid ${glass.border}`, boxShadow: glass.shadow,
-          backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
-          textAlign: 'center', animation: `${fadeUp} 500ms cubic-bezier(0.2, 0.8, 0.25, 1)`,
-        }}
-      >
+      {/* 中身(カードは無し。背景の上にそのまま) */}
+      <Box sx={{ position: 'relative', width: 'min(100%, 360px)', textAlign: 'center', animation: `${fadeUp} 500ms cubic-bezier(0.2, 0.8, 0.25, 1)` }}>
         <Box
+          component="img"
+          src="/habitww-mark.png"
+          alt=""
           aria-hidden
-          sx={{
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 64, height: 64, borderRadius: '20px',
-            background: 'linear-gradient(145deg, #4caf50 0%, #26a69a 100%)',
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.45), 0 10px 24px rgba(38,166,154,0.35)',
-            mb: 2.5,
-          }}
-        >
-          {SPROUT}
-        </Box>
+          sx={{ width: 96, height: 96, display: 'block', mx: 'auto', mb: 2.5, filter: 'drop-shadow(0 12px 28px rgba(38,166,154,0.35))' }}
+        />
 
         <Typography
           component="h1"
-          sx={{ fontFamily: '"Fredoka", "Roboto", sans-serif', fontWeight: 700, letterSpacing: 0.5, fontSize: '2.25rem', lineHeight: 1.1, color: 'text.primary' }}
+          sx={{ fontFamily: '"Fredoka", "Roboto", sans-serif', fontWeight: 700, letterSpacing: 0.5, fontSize: '2.5rem', lineHeight: 1.1, color: 'text.primary' }}
         >
           Habitww
         </Typography>
-        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1, mb: 3.5 }}>
-          習慣を、続ける力に。
+        <Typography sx={{ color: 'text.secondary', fontSize: '0.95rem', mt: 1, mb: 5 }}>
+          小さな努力が大きな成果に
         </Typography>
 
         <Stack spacing={1.25}>
@@ -190,11 +166,11 @@ export default function LoginPage() {
                 disabled={loading !== null}
                 onClick={() => handleLogin(provider)}
                 sx={{
-                  position: 'relative', height: 50, borderRadius: '14px', fontWeight: 700, fontSize: '0.95rem', textTransform: 'none',
-                  bgcolor: bg, color: fg, border: filledDark ? 'none' : '1px solid rgba(0,0,0,0.12)',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+                  position: 'relative', height: 52, borderRadius: '14px', fontWeight: 700, fontSize: '0.95rem', textTransform: 'none',
+                  bgcolor: bg, color: fg, border: filledDark ? 'none' : '1px solid rgba(0,0,0,0.1)',
+                  boxShadow: '0 2px 10px rgba(20,60,40,0.1)',
                   transition: 'transform .12s, box-shadow .12s, filter .12s',
-                  '&:hover': { bgcolor: bg, filter: 'brightness(0.97)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' },
+                  '&:hover': { bgcolor: bg, filter: 'brightness(0.97)', boxShadow: '0 6px 18px rgba(20,60,40,0.16)' },
                   '&:active': { transform: 'scale(0.985)' },
                   '&.Mui-disabled': { bgcolor: bg, color: fg, opacity: busy ? 1 : 0.55 },
                 }}
