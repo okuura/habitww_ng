@@ -14,6 +14,8 @@ import '@fontsource/mochiy-pop-one';
 interface AchievementDotsProps {
   habits: Habit[];
   completions: HabitCompletion[];
+  /** おもちゃ箱を開く(取ったバッジが無ければ渡さない → ボタンも出ない) */
+  onOpenToyBox?: () => void;
 }
 
 const DOT_PX = 7;
@@ -259,7 +261,7 @@ function CheerPopups({ anchorRef }: { anchorRef: RefObject<HTMLDivElement | null
   );
 }
 
-export default function AchievementDots({ habits, completions }: AchievementDotsProps) {
+export default function AchievementDots({ habits, completions, onOpenToyBox }: AchievementDotsProps) {
   const todayStr = toLocalDateString(new Date());
   const gridRef = useRef<HTMLDivElement>(null);
   const [cols, setCols] = useState(40);
@@ -375,6 +377,24 @@ export default function AchievementDots({ habits, completions }: AchievementDots
         <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
           これまでの実績
         </Typography>
+        {/* おもちゃ箱: 取ったバッジとメダルで遊ぶ */}
+        {onOpenToyBox && (
+          <Box
+            role="button"
+            aria-label="おもちゃ箱"
+            onClick={onOpenToyBox}
+            sx={{
+              ml: 'auto',
+              width: 36, height: 36, borderRadius: '50%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '1.25rem', lineHeight: 1, cursor: 'pointer', userSelect: 'none',
+              bgcolor: 'action.hover',
+              '&:active': { transform: 'scale(0.92)' },
+            }}
+          >
+            <span>🪙</span>
+          </Box>
+        )}
         {/* Party switch: the dancing man starts / stops the cheer popups */}
         <Box
           role="button"
@@ -382,7 +402,7 @@ export default function AchievementDots({ habits, completions }: AchievementDots
           aria-label={party ? 'パーティーを止める' : 'パーティーを始める'}
           onClick={() => setParty(p => !p)}
           sx={{
-            ml: 'auto',
+            ml: onOpenToyBox ? 0.75 : 'auto',
             width: 36, height: 36, borderRadius: '50%',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: '1.35rem', lineHeight: 1, cursor: 'pointer', userSelect: 'none',

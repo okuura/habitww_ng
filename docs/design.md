@@ -67,6 +67,11 @@ habitww_ng/
   `RankUpEffect.tsx` の全画面演出。実績ページの「カードランク」バッジは同じ素材のミニカード
 - **メダルケース** (`AchievementBook.tsx` の `MedalCase`): 月間パーフェクトのメダルを
   習慣ごとに棚に並べる(金の縁・光が走る。月末から 7 日以内に取ったものは光って NEW)
+- **おもちゃ箱** (`ToyBox.tsx` / `toyPhysics.ts`): 実績ページ上部の 🪙 から開く全画面の遊び。
+  取ったバッジと月間メダルが箱に落ちてきて、端末の傾き(`deviceorientation`)で転がり、
+  振る(`devicemotion`)か「ゆらす」ではね、指でつまんではじける。ぶつかると `navigator.vibrate`。
+  物理は自前の円の衝突(`toyPhysics.ts`、純粋関数)。何も記録しない。iOS はセンサーの許可を
+  開くボタンの中で `requestPermission` する
 - **Cowork Habits** (`CoworkPage.tsx` / `CoworkGroupCard.tsx` / `cowork.ts`):
   - 仲間とグループを作り、各メンバーが**自分の習慣を 1 つ**登録する(1 つの習慣を
     共同編集するのではない。記録は各自の habits / habit_completions のまま)
