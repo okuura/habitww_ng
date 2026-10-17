@@ -47,7 +47,8 @@ habitww_ng/
 
 ## 画面と機能
 
-- **ログイン** (`LoginPage.tsx`): Google OAuth のみ。未ログイン時に表示
+- **ログイン** (`LoginPage.tsx`): Google / X の OAuth(Apple は `enabled: false`)。未ログイン時に表示。
+  画面全体のグラデーションと漂うぼかし円の上にすりガラスのカード、文字は「Habitww」と一言だけ
 - **習慣** (`App.tsx` 内): 習慣の作成/編集/削除、当日タップで完了記録。
   タップを重ねると intensity(1=達成, 2=ばっちり達成)が切り替わる。
   記録操作時に `navigator.vibrate` で触覚フィードバック(対応端末のみ)

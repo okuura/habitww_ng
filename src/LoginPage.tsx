@@ -1,14 +1,16 @@
+import { useState, type ReactNode } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
-import Paper from '@mui/material/Paper';
-import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
-import { alpha, useTheme } from '@mui/material/styles';
+import CircularProgress from '@mui/material/CircularProgress';
+import { useTheme } from '@mui/material/styles';
+import { keyframes } from '@emotion/react';
 import type { Provider } from '@supabase/supabase-js';
-import type { ReactNode } from 'react';
 import { supabase } from './supabase';
+
+// ログイン画面: 画面全体のやわらかいグラデーションと漂うぼかし円の上に、すりガラスのカード。
+// 文字は「Habitww」と一言だけ。ログインの流れ(signInWithOAuth)は変えない
 
 const GOOGLE_ICON = (
   <Box component="svg" viewBox="0 0 24 24" sx={{ width: 20, height: 20, flexShrink: 0 }}>
@@ -54,118 +56,163 @@ const APPLE_ICON = (
  * enabled: false のものはボタンを出さない
  */
 const LOGIN_PROVIDERS: { provider: Provider; label: string; icon: ReactNode; enabled: boolean }[] = [
-  { provider: 'google', label: 'Googleでログイン', icon: GOOGLE_ICON, enabled: true },
+  { provider: 'google', label: 'Google で続ける', icon: GOOGLE_ICON, enabled: true },
   // Apple Developer Program 登録後に Supabase で有効化してから true にする(docs/integration.md)
-  { provider: 'apple', label: 'Appleでログイン', icon: APPLE_ICON, enabled: false },
+  { provider: 'apple', label: 'Apple で続ける', icon: APPLE_ICON, enabled: false },
   // X は OAuth 2.0 版('x')。'twitter' は旧 OAuth 1.0a
-  { provider: 'x', label: 'X（旧Twitter）でログイン', icon: X_ICON, enabled: true },
+  { provider: 'x', label: 'X で続ける', icon: X_ICON, enabled: true },
+];
+
+/** アプリアイコンと同じ「芽」(白) */
+const SPROUT = (
+  <Box component="svg" viewBox="0 0 48 48" sx={{ width: 38, height: 38 }}>
+    <path d="M24 42V22" stroke="#fff" strokeWidth="4" strokeLinecap="round" fill="none" />
+    <path d="M24 26c-1-8-7-12-15-12 0 8 5 13 15 12z" fill="#fff" />
+    <path d="M24 20c1-8 8-12 16-11 0 8-6 13-16 11z" fill="#fff" opacity="0.92" />
+  </Box>
+);
+
+const fadeUp = keyframes`
+  from { opacity: 0; transform: translateY(16px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+`;
+const drift1 = keyframes`
+  from { transform: translate(0, 0); }
+  to   { transform: translate(60px, 40px); }
+`;
+const drift2 = keyframes`
+  from { transform: translate(0, 0); }
+  to   { transform: translate(-50px, 60px); }
+`;
+const drift3 = keyframes`
+  from { transform: translate(0, 0); }
+  to   { transform: translate(40px, -50px); }
+`;
+
+/** 背景に漂うぼかし円 */
+const BLOBS = [
+  { left: '-10%', top: '-8%', size: 'min(70vw, 420px)', color: '#66bb6a', opacity: 0.55, darkOpacity: 0.28, anim: drift1, duration: 22 },
+  { left: '55%', top: '10%', size: 'min(60vw, 360px)', color: '#4db6ac', opacity: 0.5, darkOpacity: 0.26, anim: drift2, duration: 26 },
+  { left: '20%', top: '62%', size: 'min(65vw, 380px)', color: '#c5e1a5', opacity: 0.6, darkOpacity: 0.18, anim: drift3, duration: 18 },
 ];
 
 export default function LoginPage() {
   const theme = useTheme();
+  const dark = theme.palette.mode === 'dark';
+  const [loading, setLoading] = useState<Provider | null>(null);
+  const [failed, setFailed] = useState(false);
 
   const handleLogin = async (provider: Provider) => {
-    await supabase.auth.signInWithOAuth({
+    if (loading) return;
+    setLoading(provider);
+    setFailed(false);
+    const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
         redirectTo: window.location.origin,
       },
     });
+    // 成功ならこのあとリダイレクトされる。戻ってきたら失敗
+    if (error) { setLoading(null); setFailed(true); }
   };
+
+  const glass = dark
+    ? { bg: 'rgba(18,28,24,0.6)', border: 'rgba(255,255,255,0.08)', shadow: '0 24px 60px rgba(0,0,0,0.45)' }
+    : { bg: 'rgba(255,255,255,0.62)', border: 'rgba(255,255,255,0.55)', shadow: '0 24px 60px rgba(20,60,40,0.18)' };
 
   return (
     <Box
       sx={{
-        minHeight: '100vh',
-        bgcolor: 'background.default',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        p: 2,
+        position: 'fixed', inset: 0, overflow: 'hidden',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        pt: 'env(safe-area-inset-top)', pb: 'env(safe-area-inset-bottom)', px: 2,
+        background: dark
+          ? 'linear-gradient(160deg, #0b1712 0%, #0e1f1b 100%)'
+          : 'linear-gradient(160deg, #eef7f1 0%, #e3f3ef 100%)',
       }}
     >
-      <Paper
-        elevation={0}
+      {/* 漂うぼかし円 */}
+      {BLOBS.map((b, i) => (
+        <Box
+          key={i}
+          aria-hidden
+          sx={{
+            position: 'absolute', left: b.left, top: b.top, width: b.size, height: b.size, borderRadius: '50%',
+            bgcolor: b.color, opacity: dark ? b.darkOpacity : b.opacity, filter: 'blur(70px)',
+            animation: `${b.anim} ${b.duration}s ease-in-out infinite alternate`,
+            '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+            pointerEvents: 'none',
+          }}
+        />
+      ))}
+
+      {/* すりガラスのカード */}
+      <Box
         sx={{
-          width: '100%',
-          maxWidth: 400,
-          p: { xs: 4, sm: 5 },
-          borderRadius: 4,
-          border: '1px solid',
-          borderColor: 'divider',
-          textAlign: 'center',
+          position: 'relative', width: 'min(100%, 400px)', p: { xs: 3.5, sm: 4 }, borderRadius: '28px',
+          bgcolor: glass.bg, border: `1px solid ${glass.border}`, boxShadow: glass.shadow,
+          backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
+          textAlign: 'center', animation: `${fadeUp} 500ms cubic-bezier(0.2, 0.8, 0.25, 1)`,
         }}
       >
         <Box
+          aria-hidden
           sx={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 72,
-            height: 72,
-            borderRadius: 3,
-            bgcolor: alpha(theme.palette.primary.main, 0.1),
-            mb: 3,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 64, height: 64, borderRadius: '20px',
+            background: 'linear-gradient(145deg, #4caf50 0%, #26a69a 100%)',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.45), 0 10px 24px rgba(38,166,154,0.35)',
+            mb: 2.5,
           }}
         >
-          <CalendarTodayIcon sx={{ fontSize: 36, color: 'primary.main' }} />
+          {SPROUT}
         </Box>
 
         <Typography
-          variant="h5"
-          sx={{
-            fontFamily: '"Fredoka", "Roboto", sans-serif',
-            fontWeight: 700,
-            letterSpacing: 0.5,
-            fontSize: '2rem',
-            color: 'primary.main',
-            mb: 1,
-          }}
+          component="h1"
+          sx={{ fontFamily: '"Fredoka", "Roboto", sans-serif', fontWeight: 700, letterSpacing: 0.5, fontSize: '2.25rem', lineHeight: 1.1, color: 'text.primary' }}
         >
           Habitww
         </Typography>
-        <Typography variant="body2" sx={{ color: 'text.secondary', mb: 4, lineHeight: 1.6 }}>
-          毎日の習慣を記録して、継続する力を身につけよう。
+        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1, mb: 3.5 }}>
+          習慣を、続ける力に。
         </Typography>
 
-        <Divider sx={{ mb: 3 }}>
-          <Typography variant="caption" sx={{ color: 'text.disabled', px: 1 }}>
-            ログイン
-          </Typography>
-        </Divider>
-
-        <Stack spacing={1.5}>
-          {LOGIN_PROVIDERS.filter(p => p.enabled).map(({ provider, label, icon }) => (
-            <Button
-              key={provider}
-              fullWidth
-              variant="outlined"
-              size="large"
-              onClick={() => handleLogin(provider)}
-              startIcon={icon}
-              sx={{
-                borderRadius: 2,
-                fontWeight: 600,
-                fontSize: '0.95rem',
-                py: 1.4,
-                borderColor: 'divider',
-                color: 'text.primary',
-                '&:hover': {
-                  bgcolor: alpha(theme.palette.primary.main, 0.04),
-                  borderColor: 'text.secondary',
-                },
-                textTransform: 'none',
-              }}
-            >
-              {label}
-            </Button>
-          ))}
+        <Stack spacing={1.25}>
+          {LOGIN_PROVIDERS.filter(p => p.enabled).map(({ provider, label, icon }) => {
+            const filledDark = provider === 'x' || provider === 'apple';
+            const bg = filledDark ? (dark ? '#ffffff' : '#0f0f0f') : '#ffffff';
+            const fg = filledDark ? (dark ? '#0f0f0f' : '#ffffff') : '#1a1a1a';
+            const busy = loading === provider;
+            return (
+              <Button
+                key={provider}
+                fullWidth
+                disabled={loading !== null}
+                onClick={() => handleLogin(provider)}
+                sx={{
+                  position: 'relative', height: 50, borderRadius: '14px', fontWeight: 700, fontSize: '0.95rem', textTransform: 'none',
+                  bgcolor: bg, color: fg, border: filledDark ? 'none' : '1px solid rgba(0,0,0,0.12)',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+                  transition: 'transform .12s, box-shadow .12s, filter .12s',
+                  '&:hover': { bgcolor: bg, filter: 'brightness(0.97)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' },
+                  '&:active': { transform: 'scale(0.985)' },
+                  '&.Mui-disabled': { bgcolor: bg, color: fg, opacity: busy ? 1 : 0.55 },
+                }}
+              >
+                <Box sx={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', display: 'flex', color: fg }}>
+                  {busy ? <CircularProgress size={18} sx={{ color: fg }} /> : icon}
+                </Box>
+                {label}
+              </Button>
+            );
+          })}
         </Stack>
-
-        <Typography variant="caption" sx={{ display: 'block', color: 'text.disabled', mt: 3, lineHeight: 1.5 }}>
-          ログインすることで、習慣データがあなたのアカウントに安全に保存されます。
-        </Typography>
-      </Paper>
+        {failed && (
+          <Typography variant="caption" sx={{ display: 'block', color: 'error.main', mt: 1.5 }}>
+            ログインできませんでした。もう一度お試しください
+          </Typography>
+        )}
+      </Box>
     </Box>
   );
 }
