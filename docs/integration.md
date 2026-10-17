@@ -97,6 +97,8 @@ SQL Editor で実行するか、`npx supabase link` → `npx supabase db push`�
 4. Cowork の応援(👏)は `cowork_cheers`(`20261018000000_create_cowork_cheers.sql`。RLS と
    Realtime の publication 追加まで同じファイル)。テーブルが無いと SELECT が失敗するので、
    アプリは応援の機能ごと隠す(行をタップしても何も起きない)
+5. 習慣のアーカイブは `habits.archived_at`(`20261019000000_add_habit_archived.sql`)。列が無いと
+   アーカイブの `update` だけが失敗してスナックバーが出る(ほかは動く)
 
 ### 認証(Google OAuth)
 

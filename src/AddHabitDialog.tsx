@@ -24,10 +24,12 @@ interface AddHabitDialogProps {
   onColorChange: (v: string) => void;
   saving: boolean;
   onSubmit: () => void;
+  /** 送信ボタンの文言(既定「カードを作る」。カードの変更では「変更完了」) */
+  submitLabel?: string;
 }
 
 export default function AddHabitDialog({
-  open, onClose, paperBg, colors, name, onNameChange, ideal, onIdealChange, color, onColorChange, saving, onSubmit,
+  open, onClose, paperBg, colors, name, onNameChange, ideal, onIdealChange, color, onColorChange, saving, onSubmit, submitLabel,
 }: AddHabitDialogProps) {
   // 作ったあとすぐ裏面を見せるので、裏面のコードを先に読み込んでおく
   useEffect(() => {
@@ -110,7 +112,7 @@ export default function AddHabitDialog({
               '&:hover': { bgcolor: darken(color, 0.08) },
             }}
           >
-            カードを作る
+            {submitLabel ?? 'カードを作る'}
           </Button>
         </Box>
       </Box>

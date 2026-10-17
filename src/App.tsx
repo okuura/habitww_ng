@@ -8,6 +8,7 @@ import CardContent from '@mui/material/CardContent';
 import CardActions from '@mui/material/CardActions';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
+import ButtonBase from '@mui/material/ButtonBase';
 import TextField from '@mui/material/TextField';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -51,6 +52,9 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import BoltIcon from '@mui/icons-material/Bolt';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import ArchiveOutlinedIcon from '@mui/icons-material/ArchiveOutlined';
+import ArchivedHabitsDialog from './ArchivedHabitsDialog';
 import Diversity3Icon from '@mui/icons-material/Diversity3';
 import { alpha, darken, lighten } from '@mui/material/styles';
 import { keyframes } from '@emotion/react';
@@ -536,6 +540,10 @@ function AppContent() {
   const [deleteAccountDialogOpen, setDeleteAccountDialogOpen] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deleteHabitTarget, setDeleteHabitTarget] = useState<string | null>(null);
+  const [archiveHabitTarget, setArchiveHabitTarget] = useState<string | null>(null);
+  const [archivedOpen, setArchivedOpen] = useState(false);
+  // 「カードの変更」で開いているときの習慣 id(null なら新規作成)
+  const [editHabitTarget, setEditHabitTarget] = useState<string | null>(null);
   const [page, setPage] = useState<'habits' | 'stats' | 'achievements' | 'cowork'>('habits');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editingHabitId, setEditingHabitId] = useState<string | null>(null);
@@ -667,6 +675,14 @@ function AppContent() {
   );
   const completedToday = new Set(todayIntensity.keys());
 
+  // 記録画面に出す習慣(アーカイブしていないもの)と、アーカイブした習慣(新しい順)。
+  // 実績・統計・キャッシュには全部(habits)を渡す
+  const activeHabits = useMemo(() => habits.filter(h => !h.archived_at), [habits]);
+  const archivedHabits = useMemo(
+    () => habits.filter(h => !!h.archived_at).sort((a, b) => (b.archived_at ?? '').localeCompare(a.archived_at ?? '')),
+    [habits],
+  );
+
   const completionsByHabit = new Map<string, Map<string, number>>();
   const onTimeByHabit = new Map<string, Set<string>>();
   for (const c of completions) {
@@ -719,9 +735,9 @@ function AppContent() {
     // 2-level cycle: 0(未実施) → 1(達成) → 2(ばっちり達成) → 0
     const nextIntensity = current >= 2 ? 0 : current + 1;
 
-    const wasAllDone = habits.length > 0 && habits.every(h => completedToday.has(h.id));
-    const willBeAllDone = habits.length > 0 && nextIntensity > 0
-      && habits.every(h => h.id === habit.id || completedToday.has(h.id));
+    const wasAllDone = activeHabits.length > 0 && activeHabits.every(h => completedToday.has(h.id));
+    const willBeAllDone = activeHabits.length > 0 && nextIntensity > 0
+      && activeHabits.every(h => h.id === habit.id || completedToday.has(h.id));
 
     // 疾風迅雷: その日の最初の達成が実施時間 + 10 分以内か。
     // 今日すでに取っていれば、一周させて押し直しても疾風迅雷のまま
@@ -819,6 +835,74 @@ function AppContent() {
     setToggling(null);
   };
 
+  /** 追加・変更ダイアログを閉じて入力を戻す */
+  const closeHabitDialog = () => {
+    setDialogOpen(false);
+    setEditHabitTarget(null);
+    setNewHabitName('');
+    setNewHabitColor(HABIT_COLORS[0]);
+    setNewHabitIdeal('');
+  };
+  const openAddDialog = () => {
+    setEditHabitTarget(null);
+    setNewHabitName('');
+    setNewHabitColor(HABIT_COLORS[0]);
+    setNewHabitIdeal('');
+    setDialogOpen(true);
+  };
+  /** 「カードの変更」: 作成時と同じダイアログを値入りで開く */
+  const openEditDialog = (habitId: string) => {
+    const habit = habits.find(h => h.id === habitId);
+    if (!habit) return;
+    setEditHabitTarget(habitId);
+    setNewHabitName(habit.name);
+    setNewHabitColor(habit.color);
+    setNewHabitIdeal(notes.get(habitId)?.ideal ?? '');
+    setDialogOpen(true);
+  };
+  const handleEditHabit = async () => {
+    const id = editHabitTarget;
+    const habit = habits.find(h => h.id === id);
+    if (!id || !habit || !newHabitName.trim()) return;
+    const name = newHabitName.trim();
+    const color = newHabitColor;
+    const ideal = newHabitIdeal.trim();
+    setSaving(true);
+    const before = habit;
+    setHabits(prev => prev.map(h => (h.id === id ? { ...h, name, color } : h)));
+    const { error } = await supabase.from('habits').update({ name, color }).eq('id', id);
+    if (error) {
+      setHabits(prev => prev.map(h => (h.id === id ? before : h)));
+      setSaving(false);
+      setSnackbarMsg('カードを変更できませんでした');
+      return;
+    }
+    if (ideal !== (notes.get(id)?.ideal ?? '')) await handleSaveNote(id, { ideal });
+    setSaving(false);
+    closeHabitDialog();
+    vibrate(12);
+  };
+
+  /** アーカイブ: 記録画面から隠す(記録は残る)。もう一度「戻す」で現役に */
+  const setArchived = async (habitId: string, archived: boolean) => {
+    const before = habits.find(h => h.id === habitId);
+    if (!before) return;
+    const archived_at = archived ? new Date().toISOString() : null;
+    setHabits(prev => prev.map(h => (h.id === habitId ? { ...h, archived_at } : h)));
+    const { error } = await supabase.from('habits').update({ archived_at }).eq('id', habitId);
+    if (error) {
+      setHabits(prev => prev.map(h => (h.id === habitId ? before : h)));
+      setSnackbarMsg(archived ? 'アーカイブできませんでした' : '戻せませんでした');
+      return;
+    }
+    vibrate(10);
+  };
+  const handleArchiveHabit = async () => {
+    const id = archiveHabitTarget;
+    setArchiveHabitTarget(null);
+    if (id) await setArchived(id, true);
+  };
+
   const handleAddHabit = async () => {
     if (!newHabitName.trim() || !user) return;
     setSaving(true);
@@ -874,11 +958,11 @@ function AppContent() {
   };
   const handleDragEnd = async ({ active, over }: DragEndEvent) => {
     if (!over || active.id === over.id) return;
-    const from = habits.findIndex(h => h.id === active.id);
-    const to = habits.findIndex(h => h.id === over.id);
+    const from = activeHabits.findIndex(h => h.id === active.id);
+    const to = activeHabits.findIndex(h => h.id === over.id);
     if (from < 0 || to < 0) return;
-    const { ordered, changed } = reorderHabits(habits, from, to);
-    setHabits(ordered);
+    const { ordered, changed } = reorderHabits(activeHabits, from, to);
+    setHabits([...ordered, ...archivedHabits]);
     const results = await Promise.all(changed.map(h =>
       supabase.from('habits').update({ sort_order: h.sort_order }).eq('id', h.id),
     ));
@@ -1015,7 +1099,7 @@ function AppContent() {
       .insert({ habit_id: yesterdayHabitTarget, completed_date: yesterdayStr, intensity: 1 });
   };
 
-  const completedCount = habits.filter(h => completedToday.has(h.id)).length;
+  const completedCount = activeHabits.filter(h => completedToday.has(h.id)).length;
   const displayName = userDisplayName(user) ?? initialCache?.userName;
   const avatarLetter = displayName?.[0]?.toUpperCase()
     ?? user?.email?.[0].toUpperCase() ?? '?';
@@ -1033,7 +1117,7 @@ function AppContent() {
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-      {fever && <FeverOverlay colors={habits.map(h => h.color)} />}
+      {fever && <FeverOverlay colors={activeHabits.map(h => h.color)} />}
       {rankUp && <RankUpEffect rankUp={rankUp} onClose={closeRankUp} />}
       {awardOpen && evaluation && (
         <Suspense fallback={null}>
@@ -1067,14 +1151,14 @@ function AppContent() {
               {page === 'habits' ? 'Habitww' : page === 'stats' ? 'Habits Insight' : page === 'achievements' ? 'Achievements' : 'Cowork Habits'}
             </Typography>
           </Box>
-          {!loading && habits.length > 0 && page === 'habits' && (
+          {!loading && activeHabits.length > 0 && page === 'habits' && (
             <Chip
-              label={`${completedCount} / ${habits.length} 完了`}
-              color={completedCount === habits.length ? 'primary' : 'default'}
+              label={`${completedCount} / ${activeHabits.length} 完了`}
+              color={completedCount === activeHabits.length ? 'primary' : 'default'}
               size="small"
               sx={{
                 fontWeight: 600, mr: 1,
-                ...(completedCount === habits.length ? {
+                ...(completedCount === activeHabits.length ? {
                   background: RAINBOW, backgroundSize: '300% 100%', color: '#fff',
                   textShadow: '0 1px 1px rgba(0,0,0,0.35)',
                   animation: `${rainbowShift} 3s linear infinite`,
@@ -1167,7 +1251,7 @@ function AppContent() {
                   <Skeleton key={i} variant="rounded" height={200} sx={{ borderRadius: 3 }} />
                 ))}
               </Stack>
-            ) : habits.length === 0 ? (
+            ) : activeHabits.length === 0 ? (
               <Box
                 sx={{
                   textAlign: 'center', py: 10, px: 4,
@@ -1182,8 +1266,8 @@ function AppContent() {
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                   右下の + ボタンから習慣を登録できます
                 </Typography>
-                <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialogOpen(true)}>
-                  最初の習慣を追加
+                <Button variant="contained" startIcon={<AddIcon />} onClick={openAddDialog}>
+                  {archivedHabits.length > 0 ? '習慣を追加' : '最初の習慣を追加'}
                 </Button>
               </Box>
             ) : (
@@ -1195,9 +1279,9 @@ function AppContent() {
                 onDragOver={handleDragOver}
                 onDragEnd={handleDragEnd}
               >
-              <SortableContext items={habits.map(h => h.id)} strategy={verticalListSortingStrategy}>
+              <SortableContext items={activeHabits.map(h => h.id)} strategy={verticalListSortingStrategy}>
               <Stack spacing={1.5}>
-                {habits.map(habit => {
+                {activeHabits.map(habit => {
                   const dateMap = completionsByHabit.get(habit.id) ?? new Map<string, number>();
                   const datesSet = new Set(dateMap.keys());
                   const currentIntensity = todayIntensity.get(habit.id) ?? 0;
@@ -1426,6 +1510,18 @@ function AppContent() {
               </SortableContext>
               </DndContext>
             )}
+
+            {/* アーカイブした習慣: 誤って押さないよう、一覧の下に小さく(設定の「アカウントを削除」と同じ形) */}
+            {!loading && archivedHabits.length > 0 && (
+              <Box sx={{ mt: 4, mb: 6, display: 'flex', justifyContent: 'center' }}>
+                <ButtonBase
+                  onClick={() => setArchivedOpen(true)}
+                  sx={{ px: 1.5, py: 1, borderRadius: 1, fontSize: '0.75rem', color: 'text.secondary', textDecoration: 'underline', textUnderlineOffset: '3px' }}
+                >
+                  アーカイブした習慣 ({archivedHabits.length})
+                </ButtonBase>
+              </Box>
+            )}
           </Container>
         )}
 
@@ -1445,7 +1541,7 @@ function AppContent() {
           <Suspense fallback={<CoworkPageSkeleton />}>
             <CoworkPage
               user={user}
-              habits={habits}
+              habits={activeHabits}
               onCreateHabit={createHabitQuick}
               onScanQR={() => setScannerOpen(true)}
               onMessage={setSnackbarMsg}
@@ -1491,6 +1587,23 @@ function AppContent() {
             const id = habitMenuTarget;
             setHabitMenuAnchor(null);
             setHabitMenuTarget(null);
+            if (id) openEditDialog(id);
+          }}
+          sx={{ gap: 1.5, py: 1.25 }}
+        >
+          <EditOutlinedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+          <Box>
+            <Typography variant="body2">カードの変更</Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: -0.25 }}>
+              名前・目標・カラー
+            </Typography>
+          </Box>
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            const id = habitMenuTarget;
+            setHabitMenuAnchor(null);
+            setHabitMenuTarget(null);
             if (id) toggleFlip(id);
           }}
           sx={{ gap: 1.5, py: 1.25 }}
@@ -1504,6 +1617,22 @@ function AppContent() {
           </Box>
         </MenuItem>
         <Divider />
+        <MenuItem
+          onClick={() => {
+            setArchiveHabitTarget(habitMenuTarget);
+            setHabitMenuAnchor(null);
+            setHabitMenuTarget(null);
+          }}
+          sx={{ gap: 1.5, py: 1.25 }}
+        >
+          <ArchiveOutlinedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+          <Box>
+            <Typography variant="body2">アーカイブ</Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: -0.25 }}>
+              記録画面から隠す。記録は残る
+            </Typography>
+          </Box>
+        </MenuItem>
         <MenuItem
           onClick={() => {
             setDeleteHabitTarget(habitMenuTarget);
@@ -1522,7 +1651,7 @@ function AppContent() {
         <Fab
           color="primary"
           aria-label="習慣を追加"
-          onClick={() => setDialogOpen(true)}
+          onClick={openAddDialog}
           sx={{ position: 'fixed', bottom: { xs: 76, sm: 88 }, right: { xs: 20, sm: 32 }, boxShadow: 4 }}
         >
           <AddIcon />
@@ -1544,7 +1673,7 @@ function AppContent() {
       {/* Add Habit: 習慣カードの形のカードに書き込む */}
       <AddHabitDialog
         open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
+        onClose={closeHabitDialog}
         paperBg={paperColorFor(darkMode ? 'dark' : 'light')}
         colors={HABIT_COLORS}
         name={newHabitName}
@@ -1554,7 +1683,43 @@ function AppContent() {
         color={newHabitColor}
         onColorChange={setNewHabitColor}
         saving={saving}
-        onSubmit={handleAddHabit}
+        onSubmit={editHabitTarget ? handleEditHabit : handleAddHabit}
+        submitLabel={editHabitTarget ? '変更完了' : 'カードを作る'}
+      />
+
+      {/* Archive Habit */}
+      <Dialog
+        open={!!archiveHabitTarget}
+        onClose={() => setArchiveHabitTarget(null)}
+        maxWidth="xs" fullWidth
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>習慣のアーカイブ</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ color: 'text.secondary' }}>
+            この習慣を記録画面から隠します。記録はそのまま残り、いつでも戻せます。アーカイブしますか？
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
+          <Button onClick={handleArchiveHabit} sx={{ borderRadius: 2 }}>はい</Button>
+          <Button
+            variant="contained"
+            onClick={() => setArchiveHabitTarget(null)}
+            sx={{ borderRadius: 2, fontWeight: 700 }}
+          >
+            いいえ
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Archived habits list */}
+      <ArchivedHabitsDialog
+        open={archivedOpen}
+        onClose={() => setArchivedOpen(false)}
+        habits={archivedHabits}
+        completions={completions}
+        onRestore={id => { void setArchived(id, false); if (archivedHabits.length <= 1) setArchivedOpen(false); }}
+        onDelete={id => setDeleteHabitTarget(id)}
       />
 
       {/* Delete Habit */}
@@ -1672,7 +1837,7 @@ function AppContent() {
           <CoworkJoinDialog
             token={pendingCowork.token}
             preview={pendingCowork.preview}
-            habits={habits}
+            habits={activeHabits}
             user={user}
             onCreateHabit={createHabitQuick}
             onClose={() => setPendingCowork(null)}

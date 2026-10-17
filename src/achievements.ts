@@ -105,13 +105,15 @@ export function buildContext(habits: Habit[], completions: HabitCompletion[], no
   }
   timed.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
-  // パーフェクトデイ: その日までに作られていた習慣を全部実施した日
+  // パーフェクトデイ: その日にあった習慣(作った日以降、アーカイブした日より前)を全部実施した日
   const created = data.map(h => toLocalDateString(new Date(h.habit.created_at)));
+  const archived = data.map(h => (h.habit.archived_at ? toLocalDateString(new Date(h.habit.archived_at)) : null));
   const days = new Set(mine.map(c => c.completed_date));
   const perfectDays = [...days].sort().filter(ds => {
     let existing = 0;
     for (let i = 0; i < data.length; i++) {
       if (created[i] > ds) continue;
+      if (archived[i] !== null && ds >= archived[i]!) continue;
       existing++;
       if (!data[i].set.has(ds)) return false;
     }

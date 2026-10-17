@@ -27,16 +27,23 @@ export function computeHabitBadges(habit: Habit, dates: Set<string>, today: Date
   const created = new Date(habit.created_at);
   created.setHours(0, 0, 0, 0);
 
+  // アーカイブした習慣は、アーカイブした日で終わった扱い(その日までを判定し、進行中にはしない)
+  const archivedAt = habit.archived_at ? new Date(habit.archived_at) : null;
+  if (archivedAt) archivedAt.setHours(0, 0, 0, 0);
+  const isArchived = archivedAt !== null && !Number.isNaN(archivedAt.getTime());
+  const limit = isArchived && archivedAt! < today ? archivedAt! : today;
+  const limitStr = toLocalDateString(limit);
+
   const perfectMonths: MonthBadge[] = [];
   let ongoingDaysLeft: number | null = null;
 
   const cursor = new Date(created.getFullYear(), created.getMonth(), 1);
-  while (cursor.getFullYear() < today.getFullYear()
-    || (cursor.getFullYear() === today.getFullYear() && cursor.getMonth() <= today.getMonth())) {
+  while (cursor.getFullYear() < limit.getFullYear()
+    || (cursor.getFullYear() === limit.getFullYear() && cursor.getMonth() <= limit.getMonth())) {
     const y = cursor.getFullYear();
     const m = cursor.getMonth();
     const monthEnd = new Date(y, m + 1, 0); // last day of month
-    const isCurrentMonth = y === today.getFullYear() && m === today.getMonth();
+    const isCurrentMonth = y === limit.getFullYear() && m === limit.getMonth();
 
     // Strict rule: every single day of the calendar month must be done.
     // A month the habit was created mid-way can never earn the medal.
@@ -46,7 +53,7 @@ export function computeHabitBadges(habit: Habit, dates: Set<string>, today: Date
     }
 
     const judgeStart = cursor;
-    const judgeEnd = isCurrentMonth ? today : monthEnd;
+    const judgeEnd = isCurrentMonth ? limit : monthEnd;
 
     let perfect = judgeStart <= judgeEnd;
     for (const d = new Date(judgeStart); d <= judgeEnd; d.setDate(d.getDate() + 1)) {
@@ -63,12 +70,14 @@ export function computeHabitBadges(habit: Habit, dates: Set<string>, today: Date
 
     if (perfect) {
       if (isCurrentMonth) {
-        if (judgeEnd < monthEnd || !dates.has(todayStr)) {
-          ongoingDaysLeft = Math.max(
-            Math.round((monthEnd.getTime() - today.getTime()) / 86400000)
-              + (dates.has(todayStr) ? 0 : 1),
-            1,
-          );
+        if (judgeEnd < monthEnd || !dates.has(limitStr)) {
+          if (!isArchived) {
+            ongoingDaysLeft = Math.max(
+              Math.round((monthEnd.getTime() - today.getTime()) / 86400000)
+                + (dates.has(todayStr) ? 0 : 1),
+              1,
+            );
+          }
         } else {
           perfectMonths.push({ year: y, month: m + 1 }); // last day done — badge earned
         }

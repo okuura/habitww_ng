@@ -113,6 +113,7 @@ export interface Habit {
   scheduled_time?: string | null; // 実施時間 "HH:MM:SS"(ローカル時刻)
   notify_enabled?: boolean; // 実施時間に通知する(iOS アプリ版のみ)
   sort_order?: number; // 表示順(小さい順)
+  archived_at?: string | null; // アーカイブした時刻。null/undefined なら現役(記録画面に出る)
 }
 
 export interface HabitCompletion {

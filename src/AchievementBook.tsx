@@ -265,9 +265,12 @@ function MedalCase({ ctx }: { ctx: AchievementContext }) {
         const created = new Date(h.habit.created_at);
         // 月の途中で作った習慣は、その月のメダルは取れないので翌月から数える
         const createdKey = created.getFullYear() * 12 + created.getMonth() + (created.getDate() === 1 ? 0 : 1);
-        return { h, createdKey, months: new Set(h.perfectMonths.filter(m => m.year === year).map(m => m.month)) };
+        // アーカイブした習慣は、その月より後の枠を出さない
+        const archivedAt = h.habit.archived_at ? new Date(h.habit.archived_at) : null;
+        const archivedKey = archivedAt && !Number.isNaN(archivedAt.getTime()) ? archivedAt.getFullYear() * 12 + archivedAt.getMonth() : null;
+        return { h, createdKey, archivedKey, months: new Set(h.perfectMonths.filter(m => m.year === year).map(m => m.month)) };
       })
-      .filter(r => r.createdKey <= year * 12 + 11)
+      .filter(r => r.createdKey <= year * 12 + 11 && (r.archivedKey === null || r.archivedKey >= year * 12))
       .sort((a, b) => b.months.size - a.months.size || a.h.habit.name.localeCompare(b.h.habit.name)),
     [ctx, year],
   );
@@ -299,7 +302,7 @@ function MedalCase({ ctx }: { ctx: AchievementContext }) {
           ))}
         </Box>
       )}
-      {rows.map(({ h, createdKey, months }) => {
+      {rows.map(({ h, createdKey, archivedKey, months }) => {
         const complete = months.size === 12;
         return (
           <Box key={h.habit.id} sx={{ mb: 1.5 }}>
@@ -317,13 +320,15 @@ function MedalCase({ ctx }: { ctx: AchievementContext }) {
               )}
             </Box>
             <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', rowGap: 0.75, px: 0.25 }}>
-              {/* 上の段(1〜6 月)が全部「作る前」なら、その段は出さない */}
-              {Array.from({ length: 12 }, (_, i) => i + 1).filter(m => !(m <= 6 && year * 12 + 5 < createdKey)).map(m => {
+              {/* 上の段(1〜6 月)が全部「作る前」、下の段(7〜12 月)が全部「アーカイブ後」なら、その段は出さない */}
+              {Array.from({ length: 12 }, (_, i) => i + 1)
+                .filter(m => !(m <= 6 && year * 12 + 5 < createdKey) && !(m >= 7 && archivedKey !== null && year * 12 + 6 > archivedKey))
+                .map(m => {
                 const key = year * 12 + (m - 1);
                 const isNow = key === nowKey;
                 let body: ReactNode = null;
                 let caption: string | null = null;
-                if (key < createdKey) {
+                if (key < createdKey || (archivedKey !== null && key > archivedKey)) {
                   body = null;
                 } else if (months.has(m)) {
                   const isFresh = fresh(year, m);
