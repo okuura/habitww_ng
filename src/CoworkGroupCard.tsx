@@ -16,12 +16,15 @@ import StarIcon from '@mui/icons-material/Star';
 import ActivityGrid from './ActivityGrid';
 import NameEmblem from './NameEmblem';
 import { coworkDays, coworkStreak, earliestApproved, gridStart, type CoworkGroupView, type CoworkMemberView } from './cowork';
-import { addDays } from './achievements';
+import { addDays, parse } from './achievements';
 
 // グループ 1 つのカード(表示だけ。データの取得や更新は CoworkPage が行う)
 
 const WEEKS = 12;
 const DAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
+/** 7 日間の表の 1 列の幅と、丸の大きさ */
+const CELL = 30;
+const DOT = 22;
 
 interface Props {
   view: CoworkGroupView;
@@ -57,24 +60,41 @@ function MemberDot({ m, done, size = 34 }: { m: CoworkMemberView; done: boolean;
 export default function CoworkGroupCard({ view, todayStr, onApprove, onReject, onMenu }: Props) {
   const theme = useTheme();
   const [open, setOpen] = useState(false);
-  const { group, members, pending, canApprove } = view;
+  const { group, members, pending, canApprove, mine } = view;
 
-  const { days, streak, grid } = useMemo(() => {
+  const { days, streak, grid, week, byDate } = useMemo(() => {
     const from = earliestApproved(members, todayStr);
     const days = coworkDays(members, from, todayStr);
     const streak = coworkStreak(days, todayStr);
-    const start = gridStart(todayStr, WEEKS);
     const byDate = new Map(days.map(d => [d.date, d]));
-    const grid = Array.from({ length: WEEKS }, (_, w) =>
+    // 今日で終わる 7 日間
+    const week = Array.from({ length: 7 }, (_, i) => {
+      const date = addDays(todayStr, i - 6);
+      return { date, label: DAY_LABELS[parse(date).getDay()], isToday: date === todayStr };
+    });
+    // これまで: グループが始まった週から今週まで(最大 WEEKS 週)。左から古い順
+    const start = gridStart(todayStr, WEEKS);
+    const firstWeek = Math.max(0, Math.floor((parse(from).getTime() - parse(start).getTime()) / 86400000 / 7));
+    const grid = Array.from({ length: WEEKS - firstWeek }, (_, w) =>
       Array.from({ length: 7 }, (_, i) => {
-        const date = addDays(start, w * 7 + i);
+        const date = addDays(start, (firstWeek + w) * 7 + i);
         return { date, day: date > todayStr ? null : byDate.get(date) ?? null };
       }));
-    return { days, streak, grid };
+    return { days, streak, grid, week, byDate };
   }, [members, todayStr]);
 
-  const allToday = days[days.length - 1]?.all ?? false;
+  const today = days[days.length - 1];
+  const allToday = today?.all ?? false;
   const everDone = days.some(d => d.all);
+  // 今日のひとこと: 自分がまだなら背中を押し、自分が済んでいれば仲間を待つ
+  const myDone = mine ? members.find(m => m.member.id === mine.id)?.set.has(todayStr) ?? true : true;
+  const left = today ? today.eligible - today.done : 0;
+  const cheer = allToday
+    ? (streak.current >= 2 ? `今日もみんなで達成！${streak.current}日連続` : '今日はみんなで達成！')
+    : !myDone && left === 1 ? 'あとはあなただけ！やれば今日は全員達成'
+    : !myDone ? `今日はあと ${left}人。まずはあなたから`
+    : left === 1 ? 'あと 1人！声をかけてみよう'
+    : `あと ${left}人。先に済ませて待とう`;
 
   return (
     <Card
@@ -111,61 +131,97 @@ export default function CoworkGroupCard({ view, todayStr, onApprove, onReject, o
           </Box>
         ))}
 
-        {/* 今日の状況 */}
-        <Box sx={{ display: 'flex', gap: 1.5, mt: 1.5, overflowX: 'auto', pb: 0.5, scrollbarWidth: 'none', '&::-webkit-scrollbar': { display: 'none' } }}>
+        {/* この 7 日間: 行がメンバー、列が日。誰がやったかが一目で分かり、今日の列で「あと何人」が見える */}
+        <Box sx={{ mt: 1.5, display: 'grid', gridTemplateColumns: `minmax(0, 1fr) repeat(7, ${CELL}px)`, columnGap: '2px', rowGap: '6px', alignItems: 'center' }} role="table" aria-label="この 7 日間のみんなの記録">
+          {/* 曜日の見出し */}
+          <Box />
+          {week.map(({ date, label, isToday }) => (
+            <Typography key={date} sx={{ textAlign: 'center', fontSize: '0.62rem', fontWeight: isToday ? 800 : 600, color: isToday ? 'warning.main' : 'text.disabled', lineHeight: 1 }}>
+              {isToday ? '今日' : label}
+            </Typography>
+          ))}
+
           {members.map(m => {
-            const done = m.set.has(todayStr);
+            const doneToday = m.set.has(todayStr);
             return (
-              <Box key={m.member.id} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, width: 60, flexShrink: 0 }}>
-                <MemberDot m={m} done={done} />
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', maxWidth: 60 }}>
-                  <Typography sx={{ fontSize: '0.68rem', fontWeight: 700, lineHeight: 1.1, minWidth: 0 }} noWrap>{m.member.display_name}</Typography>
-                  <NameEmblem id={m.member.emblem} size={12} />
+              <Box key={m.member.id} sx={{ display: 'contents' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0, pr: 0.5 }}>
+                  <MemberDot m={m} done={doneToday} size={26} />
+                  <Box sx={{ minWidth: 0 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
+                      <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, lineHeight: 1.15, minWidth: 0 }} noWrap>{m.member.display_name}</Typography>
+                      <NameEmblem id={m.member.emblem} size={12} />
+                    </Box>
+                    <Typography sx={{ fontSize: '0.6rem', color: 'text.secondary', lineHeight: 1.15 }} noWrap>{m.habitName}</Typography>
+                  </Box>
                 </Box>
-                <Typography sx={{ fontSize: '0.6rem', color: 'text.secondary', lineHeight: 1.1, maxWidth: 60 }} noWrap>{m.habitName}</Typography>
+                {week.map(({ date, isToday }) => {
+                  const eligible = m.approvedDate !== null && m.approvedDate <= date;
+                  const done = m.set.has(date);
+                  return (
+                    <Box key={date} sx={{ display: 'flex', justifyContent: 'center', bgcolor: isToday ? alpha(theme.palette.warning.main, 0.08) : 'transparent', py: '3px', borderRadius: 1 }}>
+                      <Box
+                        aria-label={`${date} ${m.member.display_name}: ${done ? '達成' : eligible ? '未達成' : '参加前'}`}
+                        sx={{
+                          width: DOT, height: DOT, borderRadius: '50%',
+                          bgcolor: done ? m.color : 'transparent',
+                          border: done ? 'none' : eligible ? `1.5px ${isToday ? 'dashed' : 'solid'} ${alpha(m.color, isToday ? 0.7 : 0.25)}` : 'none',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          boxShadow: done && isToday ? `0 0 0 2px ${alpha(m.color, 0.25)}` : 'none',
+                        }}
+                      >
+                        {done && <CheckIcon sx={{ fontSize: 12, color: '#fff' }} />}
+                      </Box>
+                    </Box>
+                  );
+                })}
               </Box>
             );
           })}
-          {members.length < 2 && (
-            <Typography variant="caption" sx={{ color: 'text.disabled', alignSelf: 'center', ml: 0.5 }}>
-              仲間を招待すると「みんなで達成」が始まります
-            </Typography>
+
+          {/* みんなで: 全員達成の日は ★ */}
+          {members.length >= 2 && (
+            <>
+              <Typography sx={{ fontSize: '0.7rem', fontWeight: 800, color: 'text.secondary', pl: 0.25 }}>みんなで</Typography>
+              {week.map(({ date, isToday }) => {
+                const d = byDate.get(date);
+                return (
+                  <Box key={date} sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: DOT + 6, bgcolor: isToday ? alpha(theme.palette.warning.main, 0.08) : 'transparent', borderRadius: 1 }}>
+                    {d?.all
+                      ? <StarIcon sx={{ fontSize: 20, color: theme.palette.warning.main, filter: `drop-shadow(0 0 4px ${alpha(theme.palette.warning.main, 0.6)})` }} />
+                      : d && d.eligible >= 2
+                        ? <Typography sx={{ fontSize: '0.6rem', fontWeight: 700, color: isToday ? 'warning.main' : 'text.disabled', lineHeight: 1 }}>{d.done}/{d.eligible}</Typography>
+                        : null}
+                  </Box>
+                );
+              })}
+            </>
           )}
         </Box>
 
-        {/* 12 週のグリッド: ★ 全員達成 / 一部達成は人数の割合で濃さ */}
-        <Box sx={{ display: 'flex', gap: '3px', mt: 1.25 }} role="img" aria-label="みんなで達成した日">
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '3px', mr: 0.25 }}>
-            {DAY_LABELS.map((d, i) => (
-              <Typography key={d} sx={{ fontSize: '0.5rem', lineHeight: '11px', height: 11, color: 'text.disabled', visibility: i % 2 === 1 ? 'visible' : 'hidden' }}>{d}</Typography>
-            ))}
+        {members.length < 2 && (
+          <Typography variant="caption" sx={{ display: 'block', color: 'text.disabled', mt: 1 }}>
+            仲間を招待すると「みんなで達成」が始まります
+          </Typography>
+        )}
+
+        {/* 今日のひとこと */}
+        {members.length >= 2 && (
+          <Box
+            sx={{
+              mt: 1.25, px: 1.25, py: 0.75, borderRadius: 1.5,
+              bgcolor: alpha(theme.palette.warning.main, allToday ? 0.16 : 0.08),
+              display: 'flex', alignItems: 'center', gap: 0.75,
+            }}
+          >
+            {allToday ? <StarIcon sx={{ fontSize: 18, color: theme.palette.warning.main }} /> : <LocalFireDepartmentIcon sx={{ fontSize: 18, color: alpha(theme.palette.warning.main, 0.8) }} />}
+            <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, flex: 1, minWidth: 0 }}>{cheer}</Typography>
           </Box>
-          {grid.map((week, w) => (
-            <Box key={w} sx={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: 1 }}>
-              {week.map(({ date, day }) => {
-                const ratio = day && day.eligible > 0 ? day.done / day.eligible : 0;
-                return (
-                  <Tooltip key={date} title={day ? `${date}: ${day.done}/${day.eligible}人` : ''} disableInteractive enterDelay={400}>
-                    <Box
-                      sx={{
-                        height: 11, borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        bgcolor: day === null ? 'transparent'
-                          : day.all ? theme.palette.warning.main
-                          : ratio > 0 ? alpha(theme.palette.primary.main, 0.2 + 0.6 * ratio)
-                          : 'action.hover',
-                      }}
-                    >
-                      {day?.all && <StarIcon sx={{ fontSize: 9, color: '#fff' }} />}
-                    </Box>
-                  </Tooltip>
-                );
-              })}
-            </Box>
-          ))}
-        </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.75 }}>
+        )}
+
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
           <Typography variant="caption" sx={{ color: 'text.secondary', flex: 1 }}>
-            {everDone ? `みんなで達成 ${days.filter(d => d.all).length}日・最長 ${streak.best}日連続` : 'みんなで達成した日はまだありません'}
+            {everDone ? `みんなで達成 ${days.filter(d => d.all).length}日・最長 ${streak.best}日連続` : members.length >= 2 ? '全員がやった日に ★ が付きます' : ''}
           </Typography>
           <Button
             size="small"
@@ -173,13 +229,44 @@ export default function CoworkGroupCard({ view, todayStr, onApprove, onReject, o
             endIcon={<ExpandMoreIcon sx={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />}
             sx={{ textTransform: 'none', color: 'text.secondary', minWidth: 0, px: 1 }}
           >
-            メンバー
+            これまで
           </Button>
         </Box>
 
-        {/* 各メンバーの草グラフ */}
+        {/* これまで: みんなで達成した日のグリッド(グループが始まった週から)と、各メンバーの草グラフ */}
         <Collapse in={open} unmountOnExit>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 1 }}>
+            {members.length >= 2 && grid.length > 0 && (
+              <Box>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', display: 'block', mb: 0.5 }}>みんなで達成した日</Typography>
+                <Box sx={{ display: 'flex', gap: '3px' }} role="img" aria-label="みんなで達成した日">
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: '3px', mr: 0.25 }}>
+                    {DAY_LABELS.map((d, i) => (
+                      <Typography key={d} sx={{ fontSize: '0.5rem', lineHeight: '13px', height: 13, color: 'text.disabled', visibility: i % 2 === 1 ? 'visible' : 'hidden' }}>{d}</Typography>
+                    ))}
+                  </Box>
+                  {grid.map((wk, w) => (
+                    <Box key={w} sx={{ display: 'flex', flexDirection: 'column', gap: '3px', width: 13 }}>
+                      {wk.map(({ date, day }) => (
+                        <Tooltip key={date} title={day ? `${date}: ${day.done}/${day.eligible}人` : ''} disableInteractive enterDelay={400}>
+                          <Box
+                            sx={{
+                              height: 13, borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              bgcolor: day === null ? 'transparent'
+                                : day.all ? theme.palette.warning.main
+                                : day.done > 0 ? alpha(theme.palette.text.primary, 0.08 + 0.22 * (day.done / Math.max(1, day.eligible)))
+                                : 'action.hover',
+                            }}
+                          >
+                            {day?.all && <StarIcon sx={{ fontSize: 10, color: '#fff' }} />}
+                          </Box>
+                        </Tooltip>
+                      ))}
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+            )}
             {members.map(m => (
               <Box key={m.member.id}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
