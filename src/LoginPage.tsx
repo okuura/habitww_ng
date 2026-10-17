@@ -150,7 +150,7 @@ export default function LoginPage() {
           Habitww
         </Typography>
         <Typography sx={{ color: 'text.secondary', fontSize: '0.95rem', mt: 1, mb: 5 }}>
-          小さな努力が大きな成果に
+          小さな努力を大きな成長に
         </Typography>
 
         <Stack spacing={1.25}>
