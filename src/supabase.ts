@@ -173,6 +173,16 @@ export interface CoworkMember {
   emblem?: string | null;
 }
 
+/** 応援(👏)。1 人 → 1 人、1 日 1 行 */
+export interface CoworkCheer {
+  id: string;
+  group_id: string;
+  from_user_id: string;
+  to_user_id: string;
+  cheer_date: string;
+  created_at: string;
+}
+
 /** 参加前の下見(RPC cowork_preview の戻り) */
 export interface CoworkPreview {
   group_id: string;

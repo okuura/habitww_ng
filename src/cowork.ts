@@ -1,5 +1,5 @@
 import type { User } from '@supabase/supabase-js';
-import { userDisplayName, type CoworkGroup, type CoworkMember } from './supabase';
+import { userDisplayName, type CoworkCheer, type CoworkGroup, type CoworkMember } from './supabase';
 import { addDays, parse } from './achievements';
 
 // Cowork Habits の計算(UI を持たない純粋な関数)。
@@ -28,6 +28,16 @@ export interface CoworkGroupView {
   mine: CoworkMember | null;
   isOwner: boolean;
   canApprove: boolean;
+  /** 今日の応援(このグループ) */
+  cheers: CoworkCheer[];
+}
+
+/** その人に今日届いている 👏(送り主の名前は同じグループのメンバーから引く。見つからなければ出さない) */
+export function cheersFor(view: { members: { member: { user_id: string; display_name: string } }[]; cheers: CoworkCheer[] }, toUserId: string): { fromUserId: string; name: string }[] {
+  const names = new Map(view.members.map(m => [m.member.user_id, m.member.display_name]));
+  return view.cheers
+    .filter(c => c.to_user_id === toUserId)
+    .flatMap(c => { const name = names.get(c.from_user_id); return name ? [{ fromUserId: c.from_user_id, name }] : []; });
 }
 
 export interface CoworkDay {

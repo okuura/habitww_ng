@@ -15,7 +15,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import StarIcon from '@mui/icons-material/Star';
 import ActivityGrid from './ActivityGrid';
 import NameEmblem from './NameEmblem';
-import { coworkDays, coworkStreak, earliestApproved, gridStart, type CoworkGroupView, type CoworkMemberView } from './cowork';
+import { cheersFor, coworkDays, coworkStreak, earliestApproved, gridStart, type CoworkGroupView, type CoworkMemberView } from './cowork';
 import { addDays, parse } from './achievements';
 
 // グループ 1 つのカード(表示だけ。データの取得や更新は CoworkPage が行う)
@@ -23,7 +23,7 @@ import { addDays, parse } from './achievements';
 const WEEKS = 12;
 const DAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
 /** 7 日間の表の 1 列の幅と、丸の大きさ */
-const CELL = 30;
+const CELL = 28;
 const DOT = 22;
 
 interface Props {
@@ -32,6 +32,36 @@ interface Props {
   onApprove: (memberId: string) => void;
   onReject: (memberId: string) => void;
   onMenu: (e: MouseEvent<HTMLElement>, view: CoworkGroupView) => void;
+  /** 仲間に 👏 を送る(もう一度で取り消し)。無ければ応援の機能を出さない(テーブル未作成) */
+  onCheer?: (toUserId: string) => void;
+}
+
+/** 今日届いている 👏 を「okuura👏 みき👏 +2」の形で */
+function CheerLine({ cheers, myUserId }: { cheers: { fromUserId: string; name: string }[]; myUserId: string | null }) {
+  if (cheers.length === 0) return null;
+  // 自分が送った分は先頭に(「+N」に隠れないように)
+  const ordered = [...cheers].sort((a, b) => Number(b.fromUserId === myUserId) - Number(a.fromUserId === myUserId));
+  // 名前の欄は狭いので、おおよその表示幅(全角 1、半角 0.6、👏 1.6)で 8 文字分まで並べ、残りは +N
+  const widthOf = (name: string) => [...name].reduce((w, ch) => w + (ch.charCodeAt(0) < 0x2e80 ? 0.6 : 1), 0) + 1.6;
+  const shown: typeof ordered = [];
+  let used = 0;
+  for (const c of ordered) {
+    const w = widthOf(c.name) + (shown.length > 0 ? 0.5 : 0);
+    if (shown.length > 0 && used + w > 8) break;
+    shown.push(c);
+    used += w;
+  }
+  const rest = cheers.length - shown.length;
+  return (
+    <Typography component="div" sx={{ fontSize: '0.62rem', lineHeight: 1.2, color: 'text.secondary', mt: '1px' }} noWrap>
+      {shown.map((c, i) => (
+        <Box key={c.fromUserId} component="span" sx={{ color: c.fromUserId === myUserId ? 'warning.main' : 'inherit', fontWeight: c.fromUserId === myUserId ? 800 : 500, mr: i < shown.length - 1 || rest > 0 ? 0.5 : 0 }}>
+          {c.name}👏
+        </Box>
+      ))}
+      {rest > 0 && <Box component="span">+{rest}</Box>}
+    </Typography>
+  );
 }
 
 /** 頭文字の丸(今日達成なら塗り、まだなら輪郭) */
@@ -57,7 +87,7 @@ function MemberDot({ m, done, size = 34 }: { m: CoworkMemberView; done: boolean;
   );
 }
 
-export default function CoworkGroupCard({ view, todayStr, onApprove, onReject, onMenu }: Props) {
+export default function CoworkGroupCard({ view, todayStr, onApprove, onReject, onMenu, onCheer }: Props) {
   const theme = useTheme();
   const [open, setOpen] = useState(false);
   const { group, members, pending, canApprove, mine } = view;
@@ -89,6 +119,9 @@ export default function CoworkGroupCard({ view, todayStr, onApprove, onReject, o
   // 今日のひとこと: 自分がまだなら背中を押し、自分が済んでいれば仲間を待つ
   const myDone = mine ? members.find(m => m.member.id === mine.id)?.set.has(todayStr) ?? true : true;
   const left = today ? today.eligible - today.done : 0;
+  const myUserId = mine?.user_id ?? null;
+  const sentAny = myUserId !== null && view.cheers.some(c => c.from_user_id === myUserId);
+  const cheerHint = onCheer && members.length >= 2 && !sentAny ? '仲間の行をタップすると 👏 を送れます' : null;
   const cheer = allToday
     ? (streak.current >= 2 ? `今日もみんなで達成！${streak.current}日連続` : '今日はみんなで達成！')
     : !myDone && left === 1 ? 'あとはあなただけ！やれば今日は全員達成'
@@ -143,9 +176,24 @@ export default function CoworkGroupCard({ view, todayStr, onApprove, onReject, o
 
           {members.map(m => {
             const doneToday = m.set.has(todayStr);
+            const isMe = m.member.user_id === myUserId;
+            const cheerable = !!onCheer && !isMe;
+            const received = onCheer ? cheersFor(view, m.member.user_id) : [];
             return (
               <Box key={m.member.id} sx={{ display: 'contents' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0, pr: 0.5 }}>
+                <Box
+                  role={cheerable ? 'button' : undefined}
+                  tabIndex={cheerable ? 0 : undefined}
+                  aria-label={cheerable ? `${m.member.display_name} に 👏 を送る` : undefined}
+                  onClick={cheerable ? () => onCheer!(m.member.user_id) : undefined}
+                  onKeyDown={cheerable ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCheer!(m.member.user_id); } } : undefined}
+                  sx={{
+                    display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0, pr: 0.5, py: 0.25, pl: 0.25, ml: -0.25, borderRadius: 1.5,
+                    cursor: cheerable ? 'pointer' : 'default', userSelect: 'none', WebkitTapHighlightColor: 'transparent',
+                    transition: 'transform .12s, background-color .12s',
+                    '&:active': cheerable ? { transform: 'scale(0.96)', bgcolor: 'action.hover' } : undefined,
+                  }}
+                >
                   <MemberDot m={m} done={doneToday} size={26} />
                   <Box sx={{ minWidth: 0 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
@@ -153,6 +201,7 @@ export default function CoworkGroupCard({ view, todayStr, onApprove, onReject, o
                       <NameEmblem id={m.member.emblem} size={12} />
                     </Box>
                     <Typography sx={{ fontSize: '0.6rem', color: 'text.secondary', lineHeight: 1.15 }} noWrap>{m.habitName}</Typography>
+                    <CheerLine cheers={received} myUserId={myUserId} />
                   </Box>
                 </Box>
                 {week.map(({ date, isToday }) => {
@@ -220,8 +269,10 @@ export default function CoworkGroupCard({ view, todayStr, onApprove, onReject, o
         )}
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-          <Typography variant="caption" sx={{ color: 'text.secondary', flex: 1 }}>
-            {everDone ? `みんなで達成 ${days.filter(d => d.all).length}日・最長 ${streak.best}日連続` : members.length >= 2 ? '全員がやった日に ★ が付きます' : ''}
+          <Typography variant="caption" sx={{ color: 'text.secondary', flex: 1, minWidth: 0 }} noWrap>
+            {cheerHint ?? (everDone
+              ? `みんなで達成 ${days.filter(d => d.all).length}日・最長 ${streak.best}日連続`
+              : members.length >= 2 ? '全員がやった日に ★ が付きます' : '')}
           </Typography>
           <Button
             size="small"

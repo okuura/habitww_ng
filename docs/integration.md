@@ -94,6 +94,9 @@ SQL Editor で実行するか、`npx supabase link` → `npx supabase db push`�
 3. 名前の横のバッジ(称号)は `auth.users.user_metadata.emblem` に持ち、Cowork の仲間に見せる分を
    `cowork_members.emblem` に写す(`20261017000000_add_cowork_member_emblem.sql`)。列が無くても
    画面は壊れない(自分の表示だけになる)
+4. Cowork の応援(👏)は `cowork_cheers`(`20261018000000_create_cowork_cheers.sql`。RLS と
+   Realtime の publication 追加まで同じファイル)。テーブルが無いと SELECT が失敗するので、
+   アプリは応援の機能ごと隠す(行をタップしても何も起きない)
 
 ### 認証(Google OAuth)
 

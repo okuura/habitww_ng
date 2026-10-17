@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, type MouseEvent } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, type MouseEvent } from 'react';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
@@ -34,7 +34,7 @@ import LinkIcon from '@mui/icons-material/Link';
 import CheckIcon from '@mui/icons-material/Check';
 import { QRCodeSVG } from 'qrcode.react';
 import type { User } from '@supabase/supabase-js';
-import { supabase, type CoworkGroup, type CoworkMember, type Habit, type HabitCompletion } from './supabase';
+import { supabase, type CoworkCheer, type CoworkGroup, type CoworkMember, type Habit, type HabitCompletion } from './supabase';
 import { inviteUrlOf, localDateOf, type CoworkGroupView, type CoworkMemberView } from './cowork';
 import CoworkGroupCard from './CoworkGroupCard';
 import CoworkCreateDialog from './CoworkCreateDialog';
@@ -61,6 +61,8 @@ export default function CoworkPage({ user, habits, onCreateHabit, onScanQR, onMe
   const [groups, setGroups] = useState<CoworkGroup[]>([]);
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [completions, setCompletions] = useState<HabitCompletion[]>([]);
+  /** 今日の応援。null はテーブルが無い(マイグレーション前)= 応援の機能を出さない */
+  const [cheers, setCheers] = useState<CoworkCheer[] | null>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [menu, setMenu] = useState<{ anchor: HTMLElement; view: CoworkGroupView } | null>(null);
@@ -79,7 +81,7 @@ export default function CoworkPage({ user, habits, onCreateHabit, onScanQR, onMe
     const { data: groupRows } = await supabase.from('cowork_groups').select('*').order('created_at', { ascending: true });
     const gs = (groupRows ?? []) as CoworkGroup[];
     if (gs.length === 0) {
-      setGroups([]); setMembers([]); setCompletions([]); setLoading(false);
+      setGroups([]); setMembers([]); setCompletions([]); setCheers([]); setLoading(false);
       return;
     }
     const { data: memberRows } = await supabase
@@ -100,8 +102,15 @@ export default function CoworkPage({ user, habits, onCreateHabit, onScanQR, onMe
         .gte('completed_date', from);
       cs = (data ?? []) as HabitCompletion[];
     }
+    // 今日の応援(テーブルがまだ無ければ機能ごと隠す)
+    const { data: cheerRows, error: cheerError } = await supabase
+      .from('cowork_cheers')
+      .select('*')
+      .in('group_id', gs.map(g => g.id))
+      .eq('cheer_date', todayStr);
     setGroups(gs); setMembers(ms); setCompletions(cs); setLoading(false);
-  }, []);
+    setCheers(cheerError ? null : (cheerRows ?? []) as CoworkCheer[]);
+  }, [todayStr]);
 
   useEffect(() => { void Promise.resolve().then(fetchAll); }, [fetchAll, reloadKey]);
 
@@ -112,6 +121,7 @@ export default function CoworkPage({ user, habits, onCreateHabit, onScanQR, onMe
       .on('postgres_changes', { event: '*', schema: 'public', table: 'habit_completions' }, fetchAll)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cowork_members' }, fetchAll)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cowork_groups' }, fetchAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cowork_cheers' }, fetchAll)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [fetchAll]);
@@ -146,9 +156,48 @@ export default function CoworkPage({ user, habits, onCreateHabit, onScanQR, onMe
         mine,
         isOwner,
         canApprove: isOwner || (group.approval === 'anyone' && iAmApproved),
+        cheers: (cheers ?? []).filter(c => c.group_id === group.id),
       };
     });
-  }, [groups, members, completions, user.id]);
+  }, [groups, members, completions, cheers, user.id]);
+
+  // 自分宛の 👏 が増えたら知らせる(初回の読み込みは除く)
+  const seenCheersRef = useRef<Set<string> | null>(null);
+  const tempIdRef = useRef(0);
+  useEffect(() => {
+    if (cheers === null || loading) return;
+    const mine = new Set(cheers.filter(c => c.to_user_id === user.id).map(c => c.id));
+    const seen = seenCheersRef.current;
+    seenCheersRef.current = mine;
+    if (!seen) return;
+    const fresh = cheers.filter(c => c.to_user_id === user.id && !seen.has(c.id));
+    if (fresh.length === 0) return;
+    const names = [...new Set(fresh.map(c => members.find(m => m.user_id === c.from_user_id)?.display_name).filter((n): n is string => !!n))];
+    if (names.length > 0) onMessage(`${names.join('・')} さんから 👏`);
+  }, [cheers, loading, members, user.id, onMessage]);
+
+  // 応援を送る(もう一度で取り消し)。先に画面を変えて、失敗したら読み直す
+  const toggleCheer = async (view: CoworkGroupView, toUserId: string) => {
+    if (cheers === null) return;
+    const existing = cheers.find(c => c.group_id === view.group.id && c.from_user_id === user.id && c.to_user_id === toUserId);
+    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
+    if (existing) {
+      setCheers(cs => (cs ?? []).filter(c => c.id !== existing.id));
+      const { error } = await supabase.from('cowork_cheers').delete().eq('id', existing.id);
+      if (error) { onMessage('応援を取り消せませんでした'); await fetchAll(); }
+      return;
+    }
+    tempIdRef.current += 1;
+    const temp: CoworkCheer = { id: `temp-${tempIdRef.current}`, group_id: view.group.id, from_user_id: user.id, to_user_id: toUserId, cheer_date: todayStr, created_at: '' };
+    setCheers(cs => [...(cs ?? []), temp]);
+    const { data, error } = await supabase
+      .from('cowork_cheers')
+      .insert({ group_id: view.group.id, from_user_id: user.id, to_user_id: toUserId, cheer_date: todayStr })
+      .select('*')
+      .single();
+    if (error || !data) { onMessage('応援を送れませんでした'); await fetchAll(); return; }
+    setCheers(cs => (cs ?? []).map(c => (c.id === temp.id ? (data as CoworkCheer) : c)));
+  };
 
   const run = async (action: () => PromiseLike<{ error: unknown } | null | void>, done?: string, fail = '更新できませんでした') => {
     setBusy(true);
@@ -240,7 +289,7 @@ export default function CoworkPage({ user, habits, onCreateHabit, onScanQR, onMe
       ) : (
         <Stack spacing={1.5}>
           {approvedViews.map(v => (
-            <CoworkGroupCard key={v.group.id} view={v} todayStr={todayStr} onApprove={approve} onReject={reject} onMenu={openMenu} />
+            <CoworkGroupCard key={v.group.id} view={v} todayStr={todayStr} onApprove={approve} onReject={reject} onMenu={openMenu} onCheer={cheers === null ? undefined : toUserId => toggleCheer(v, toUserId)} />
           ))}
           {pendingViews.map(v => (
             <Card key={v.group.id} elevation={0} sx={{ border: '1px dashed', borderColor: 'divider', borderRadius: 2 }}>

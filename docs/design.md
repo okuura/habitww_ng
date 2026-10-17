@@ -102,6 +102,10 @@ habitww_ng/
     「これまで」を開くと、グループが始まった週からの「みんなで達成した日」のグリッド
     (承認済みメンバーが 2 人以上いて全員達成した日に ★)と各メンバーの草グラフ。
     記録画面には他人の情報を出さない
+  - **応援(👏)**: 仲間の行(名前のブロック)をタップすると `cowork_cheers` に 1 行(1 人 → 1 人、
+    1 日 1 回。もう一度で取り消し)。相手の名前の下に「okuura👏 みき👏 +2」(自分が送った分は強調)。
+    今日の分だけ出す。Realtime で相手に届き、自分宛が増えたらスナックバーで「okuura さんから 👏」。
+    テーブルが無ければ機能ごと隠す(`CoworkPage` の `cheers === null`)
   - 招待トークンは `App.tsx` 起動時に `URLSearchParams` で読み取り、RPC `cowork_preview`
     で下見してから `history.replaceState` で URL から除去する
   - 旧 Share Habits(`habit_shares` / `shared_habit_viewers`)は画面から外した。
@@ -120,6 +124,7 @@ erDiagram
     auth_users ||--o{ cowork_groups : "owner_id"
     cowork_groups ||--o{ cowork_members : "group_id (CASCADE)"
     habits ||--o{ cowork_members : "habit_id (CASCADE)"
+    cowork_groups ||--o{ cowork_cheers : "group_id (CASCADE)"
 
     habits {
         uuid id PK
