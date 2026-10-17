@@ -72,6 +72,26 @@ export const SHAPE: Record<AchievementCategory, BadgeShape> = {
   secret: 'star',
 };
 
+const poly = (cx: number, cy: number, n: number, radii: number[], rot = -90) =>
+  Array.from({ length: n }, (_, i) => {
+    const r = radii[i % radii.length];
+    const a = ((rot + (360 / n) * i) * Math.PI) / 180;
+    return `${(cx + r * Math.cos(a)).toFixed(2)},${(cy + r * Math.sin(a)).toFixed(2)}`;
+  }).join(' ');
+
+/** 形の輪郭(64×64)と、面の中心 */
+export type EmblemGeometry = { d?: string; points?: string; circle?: [number, number, number]; cy: number };
+export const GEOMETRY: Record<Exclude<BadgeShape, 'trophy' | 'card'>, EmblemGeometry> = {
+  coin: { circle: [32, 32, 29], cy: 32 },
+  ribbon: { circle: [32, 27, 23], cy: 27 },
+  shield: { d: 'M32 3 L57 11 V30 C57 46 46 56 32 62 C18 56 7 46 7 30 V11 Z', cy: 30 },
+  hexagon: { points: poly(32, 32, 6, [30]), cy: 32 },
+  rosette: { points: poly(32, 32, 24, [30, 26.5]), cy: 32 },
+  gem: { d: 'M17 6 H47 L60 23 L32 61 L4 23 Z', cy: 26 },
+  star: { points: poly(32, 34, 10, [31, 16.5]), cy: 35 },
+};
+
+
 /** 金属の縁の色(明るい→暗い)と、刻む文字の地の色 */
 export const METAL: Record<Tier, { stops: string[]; dark: string; label: string }> = {
   bronze: { stops: ['#fde3c8', '#d99a62', '#a8652f', '#e7b088', '#6f421d'], dark: '#5a3415', label: '#b8743d' },

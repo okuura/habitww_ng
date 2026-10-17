@@ -95,7 +95,7 @@ export default function AchievementsPage({ habits, completions }: AchievementsPa
 
       {toyOpen && (
         <Suspense fallback={null}>
-          <ToyBox badges={toys.badges} medals={toys.medals} onClose={() => setToyOpen(false)} />
+          <ToyBox badges={toys.badges} totalBadges={achievements.evaluated.length} medals={toys.medals} onClose={() => setToyOpen(false)} />
         </Suspense>
       )}
     </Container>

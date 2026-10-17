@@ -27,6 +27,8 @@ export interface World {
   width: number;
   height: number;
   bodies: Body[];
+  /** 足場(タワー用)。上から来た物体だけが乗る。無ければ null */
+  platform: { x0: number; x1: number; y: number } | null;
 }
 
 /** ぶつかった記録(strength = ぶつかった速さ px/s) */
@@ -59,7 +61,7 @@ const BOUNCE_MIN_SPEED = 90;
 const SLOP = 0.3;
 
 export function createWorld(width: number, height: number): World {
-  return { width, height, bodies: [] };
+  return { width, height, bodies: [], platform: null };
 }
 
 export function addBody(world: World, init: { id: string; x: number; y: number; r: number; vx?: number; vy?: number; angle?: number }): Body {
@@ -75,6 +77,10 @@ export const isAsleep = (b: Body) => b.sleep >= SLEEP_FRAMES;
 
 export function wakeAll(world: World) {
   for (const b of world.bodies) b.sleep = 0;
+}
+
+export function clear(world: World) {
+  world.bodies.length = 0;
 }
 
 const clampSpeed = (b: Body) => {
@@ -94,6 +100,12 @@ function clampWalls(world: World, record: WallHit[] | null) {
     if (b.x + b.r > width) { if (record) record.push({ b, nx: -1, ny: 0, vin: b.vx }); b.x = width - b.r; }
     if (b.y - b.r < 0) { if (record) record.push({ b, nx: 0, ny: 1, vin: -b.vy }); b.y = b.r; }
     if (b.y + b.r > height) { if (record) record.push({ b, nx: 0, ny: -1, vin: b.vy }); b.y = height - b.r; }
+    // 足場: 中心が足場の上にあって、前の位置が足場より上だった物体だけ乗せる
+    const pf = world.platform;
+    if (pf && b.x >= pf.x0 && b.x <= pf.x1 && b.y + b.r > pf.y && b.py + b.r <= pf.y + 2) {
+      if (record) record.push({ b, nx: 0, ny: -1, vin: b.vy });
+      b.y = pf.y - b.r;
+    }
   }
 }
 

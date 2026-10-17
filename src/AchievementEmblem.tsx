@@ -2,7 +2,7 @@ import { useId } from 'react';
 import Box from '@mui/material/Box';
 import { alpha, darken, lighten, keyframes } from '@mui/material/styles';
 import type { AchievementCategory, Tier } from './achievements';
-import { ICONS, METAL, SHAPE, type BadgeShape } from './achievementIcons';
+import { GEOMETRY, ICONS, METAL, SHAPE } from './achievementIcons';
 import { Trophy } from './Badges';
 import { FINISH } from './cardFinish';
 import type { Rarity } from './habitStats';
@@ -23,24 +23,6 @@ const glow = keyframes`
   0%, 100% { filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3)) drop-shadow(0 0 0 rgba(255,196,0,0)); }
   50% { filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3)) drop-shadow(0 0 7px rgba(255,196,0,0.95)); }
 `;
-
-const poly = (cx: number, cy: number, n: number, radii: number[], rot = -90) =>
-  Array.from({ length: n }, (_, i) => {
-    const r = radii[i % radii.length];
-    const a = ((rot + (360 / n) * i) * Math.PI) / 180;
-    return `${(cx + r * Math.cos(a)).toFixed(2)},${(cy + r * Math.sin(a)).toFixed(2)}`;
-  }).join(' ');
-
-/** 形の輪郭(64×64)と、面の中心 */
-const GEOMETRY: Record<Exclude<BadgeShape, 'trophy' | 'card'>, { d?: string; points?: string; circle?: [number, number, number]; cy: number }> = {
-  coin: { circle: [32, 32, 29], cy: 32 },
-  ribbon: { circle: [32, 27, 23], cy: 27 },
-  shield: { d: 'M32 3 L57 11 V30 C57 46 46 56 32 62 C18 56 7 46 7 30 V11 Z', cy: 30 },
-  hexagon: { points: poly(32, 32, 6, [30]), cy: 32 },
-  rosette: { points: poly(32, 32, 24, [30, 26.5]), cy: 32 },
-  gem: { d: 'M17 6 H47 L60 23 L32 61 L4 23 Z', cy: 26 },
-  star: { points: poly(32, 34, 10, [31, 16.5]), cy: 35 },
-};
 
 function Outline({ g, ...rest }: { g: (typeof GEOMETRY)[keyof typeof GEOMETRY] } & React.SVGProps<SVGPathElement & SVGCircleElement & SVGPolygonElement>) {
   if (g.circle) return <circle cx={g.circle[0]} cy={g.circle[1]} r={g.circle[2]} {...rest} />;

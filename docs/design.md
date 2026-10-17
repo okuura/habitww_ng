@@ -70,8 +70,13 @@ habitww_ng/
 - **おもちゃ箱** (`ToyBox.tsx` / `toyPhysics.ts`): 実績ページ上部の 🪙 から開く全画面の遊び。
   取ったバッジと月間メダルが箱に落ちてきて、端末の傾き(`deviceorientation`)で転がり、
   振る(`devicemotion`)か「ゆらす」ではね、指でつまんではじける。ぶつかると `navigator.vibrate`。
-  物理は自前の円の衝突(`toyPhysics.ts`、純粋関数)。何も記録しない。iOS はセンサーの許可を
-  開くボタンの中で `requestPermission` する
+  物理は自前の円の衝突(`toyPhysics.ts`、純粋関数。位置を先に直してから速度を位置の差で出す)。
+  iOS はセンサーの許可を開くボタンの中で `requestPermission` する
+  - **積み上げタワー**: 足場(`World.platform`)の上に 1 つずつ指で落として何個積めるか。足場の外
+    (箱の底)に落ちたら 1.2 秒後に終了。自己ベストだけ端末に覚える(`habitww-toybox-tower-best`)
+  - **画像でシェア** (`toyShare.tsx`): 箱の中の山をそのまま 1080×1350 の SVG に描き直し(HTML を含む
+    画面のバッジは使えないので、全部 SVG 版を持つ)、canvas で PNG にして Web Share API で共有。
+    共有シートが無い環境では画像を見せて保存してもらい、X の投稿画面を開く
 - **Cowork Habits** (`CoworkPage.tsx` / `CoworkGroupCard.tsx` / `cowork.ts`):
   - 仲間とグループを作り、各メンバーが**自分の習慣を 1 つ**登録する(1 つの習慣を
     共同編集するのではない。記録は各自の habits / habit_completions のまま)
