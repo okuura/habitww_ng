@@ -16,7 +16,7 @@ import { SHAPE } from './achievementIcons';
 import AchievementEmblem from './AchievementEmblem';
 import { Medal } from './Badges';
 import {
-  addBody, clear, createWorld, grab, impulseAll, moveHeld, pick, release, shelfLayout, step, sweep, wakeAll,
+  addBody, clear, createWorld, grab, impulseAll, moveHeld, pick, release, shelfLayout, step, sweep, unpinAll, wakeAll,
   type Body, type Vec, type World,
 } from './toyPhysics';
 import {
@@ -24,8 +24,9 @@ import {
   type ToyItem, type ToyMedal,
 } from './toyShare';
 
-// おもちゃ箱: 取ったバッジとメダルが棚のように整然と並んでいて、指でなぞるか「ゆらす」で崩せる。
-// 崩れたあとは指でつまんではじける。「積み上げタワー」は、足場の上に 1 つずつ落として何個積めるか。
+// おもちゃ箱: 取ったバッジとメダルが棚のように整然と並んでいて(固定)、指でなぞった物体だけ外れて落ちる。
+// 落ちた物体がぶつかった相手も外れるので、触れたところから順に崩れていく。「ゆらす」は全部一度に崩す。
+// 外れた物体は指でつまんではじける。「積み上げタワー」は、足場の上に 1 つずつ落として何個積めるか。
 // 箱の様子は画像にしてシェアできる。端末の傾き・振りのセンサーは使わない(iOS の許可ダイアログを出さない)。
 // 物理は toyPhysics、画像は toyShare。ここは描画と入力
 
@@ -46,8 +47,8 @@ const MEDAL_WIDTH = 40;
 /** これより強くぶつかったら振動 */
 const HAPTIC_MIN = 260;
 const HAPTIC_STRONG = 900;
-/** 棚に並んでいるとき、これだけ指が動いたら「崩す」 */
-const SWEEP_START = 10;
+/** なぞり始めの揺れを無視する距離(px)。これより動いたら物体を外し始める */
+const SWEEP_START = 4;
 /** なぞる速さの上限(px/s) */
 const SWEEP_MAX = 1800;
 /** 重力は常に下 */
@@ -118,7 +119,7 @@ export default function ToyBox({ badges, totalBadges, medals, onClose }: Props) 
   const worldRef = useRef<World | null>(null);
   const heldRef = useRef<{ body: Body; pointerId: number; last: number } | null>(null);
   const modeRef = useRef<Mode>('free');
-  /** 棚に並んだまま(物理を止めている) */
+  /** 棚に並んだまま、まだ 1 つも外れていない(物理を止めている) */
   const shelvedRef = useRef(true);
   /** 棚を崩すなぞり(指を置いた位置と、直前の位置) */
   const sweepRef = useRef<{ pointerId: number; startX: number; startY: number; x: number; y: number; t: number } | null>(null);
@@ -138,30 +139,30 @@ export default function ToyBox({ badges, totalBadges, medals, onClose }: Props) 
     for (const el of elRefs.current.values()) el.style.transform = 'translate(-999px, -999px)';
   };
 
-  /** 棚に並べる(全部を置き直して、物理を止める) */
+  /** 棚に並べる(全部を固定して置き直し、物理を止める) */
   const shelve = useCallback((world: World) => {
     heldRef.current = null;
     sweepRef.current = null;
     clear(world);
     for (const slot of shelfLayout(items, world.width, world.height)) {
       const it = itemById.get(slot.id)!;
-      addBody(world, { id: it.id, r: it.r, x: slot.x, y: slot.y });
+      addBody(world, { id: it.id, r: it.r, x: slot.x, y: slot.y, pinned: true });
     }
     shelvedRef.current = true;
     setShelved(true);
   }, [items, itemById]);
-  /** 棚を崩す(物理を動かし始める) */
-  const unshelve = (world: World) => {
+  /** 最初の 1 つが外れた(物理を動かし始める) */
+  const unshelve = () => {
     if (!shelvedRef.current) return;
     shelvedRef.current = false;
     setShelved(false);
-    wakeAll(world);
   };
 
   const shake = () => {
     const world = worldRef.current;
     if (!world || modeRef.current !== 'free') return;
-    unshelve(world);
+    unshelve();
+    unpinAll(world);
     impulseAll(world, 650, DOWN);
     vibrate([15, 30, 15]);
   };
@@ -346,15 +347,14 @@ export default function ToyBox({ badges, totalBadges, medals, onClose }: Props) 
       aimTower(x);
       return;
     }
-    if (shelvedRef.current) {
-      // 棚に並んでいる間は、つまむのではなく、なぞって崩す
+    if (heldRef.current || sweepRef.current) return;
+    const body = pick(world, x, y);
+    if (!body || body.pinned) {
+      // 固定された物体や何も無いところから始めたら、なぞって崩す(触れた物体だけ外れる)
       e.currentTarget.setPointerCapture(e.pointerId);
       sweepRef.current = { pointerId: e.pointerId, startX: x, startY: y, x, y, t: performance.now() };
       return;
     }
-    if (heldRef.current) return;
-    const body = pick(world, x, y);
-    if (!body) return;
     grab(body);
     heldRef.current = { body, pointerId: e.pointerId, last: performance.now() };
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -368,16 +368,16 @@ export default function ToyBox({ badges, totalBadges, medals, onClose }: Props) 
       const { x, y } = localPos(e);
       const now = performance.now();
       const dt = Math.max(0.004, (now - sw.t) / 1000);
-      if (shelvedRef.current) {
-        if (Math.hypot(x - sw.startX, y - sw.startY) < SWEEP_START) return;
-        unshelve(world);
-        vibrate([10, 20, 10]);
-      }
+      if (Math.hypot(x - sw.startX, y - sw.startY) < SWEEP_START) return;
       const v = { x: (x - sw.x) / dt, y: (y - sw.y) / dt };
       const speed = Math.hypot(v.x, v.y);
       if (speed > SWEEP_MAX) { v.x *= SWEEP_MAX / speed; v.y *= SWEEP_MAX / speed; }
-      sweep(world, { x: sw.x, y: sw.y }, { x, y }, v);
+      const touched = sweep(world, { x: sw.x, y: sw.y }, { x, y }, v);
       sw.x = x; sw.y = y; sw.t = now;
+      if (touched > 0 && shelvedRef.current) {
+        unshelve();
+        vibrate([10, 20, 10]);
+      }
       return;
     }
     const held = heldRef.current;
@@ -517,7 +517,7 @@ export default function ToyBox({ badges, totalBadges, medals, onClose }: Props) 
         {mode === 'free' ? (
           <>
             <Typography variant="caption" sx={{ flex: 1, color: 'rgba(255,255,255,0.6)' }}>
-              {shelved ? 'なぞるか、ゆらすと崩れる' : '指でつまんで、はじく'}
+              {shelved ? 'なぞると、触れたところから崩れる' : '指でつまんで、はじく'}
             </Typography>
             {!shelved && (
               <IconButton aria-label="並べ直す" onClick={rearrange} sx={{ color: 'rgba(255,255,255,0.8)', border: '1px solid rgba(255,255,255,0.35)', borderRadius: 2, p: '5px' }}>
