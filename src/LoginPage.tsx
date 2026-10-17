@@ -137,10 +137,10 @@ export default function LoginPage() {
       <Box sx={{ position: 'relative', width: 'min(100%, 360px)', textAlign: 'center', animation: `${fadeUp} 500ms cubic-bezier(0.2, 0.8, 0.25, 1)` }}>
         <Box
           component="img"
-          src="/habitww-mark.png"
+          src="/app-icon-512.png"
           alt=""
           aria-hidden
-          sx={{ width: 96, height: 96, display: 'block', mx: 'auto', mb: 2.5, filter: 'drop-shadow(0 12px 28px rgba(38,166,154,0.35))' }}
+          sx={{ width: 112, height: 112, display: 'block', mx: 'auto', mb: 2.5, borderRadius: '26px', boxShadow: '0 12px 32px rgba(20,60,40,0.22)' }}
         />
 
         <Typography
