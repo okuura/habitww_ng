@@ -9,7 +9,10 @@ import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
 import { useTheme } from '@mui/material/styles';
 import type { User } from '@supabase/supabase-js';
-import { supabase, userDisplayName } from './supabase';
+import { supabase, userDisplayName, userEmblem } from './supabase';
+import type { EvaluatedAchievement } from './achievements';
+import AchievementEmblem from './AchievementEmblem';
+import NameEmblem from './NameEmblem';
 
 // アカウントの設定。iOS アプリの「通知・ウィジェット」設定画面と同じく、下からせり上がるシートに
 // グループ分けされた一覧(上にタイトルと「完了」)。上のバーを下へ引っ張っても閉じられる
@@ -23,6 +26,8 @@ interface SettingsDialogProps {
   onClose: () => void;
   user: User;
   dark: boolean;
+  /** 取ったバッジ(名前の横に出すバッジの候補) */
+  earnedBadges: EvaluatedAchievement[];
   onUserUpdated: (user: User) => void;
   onSignOut: () => void;
   onDeleteAccount: () => void;
@@ -30,15 +35,29 @@ interface SettingsDialogProps {
 
 const MAX_NAME = 30;
 
-export default function SettingsDialog({ open, onClose, user, dark, onUserUpdated, onSignOut, onDeleteAccount }: SettingsDialogProps) {
+export default function SettingsDialog({ open, onClose, user, dark, earnedBadges, onUserUpdated, onSignOut, onDeleteAccount }: SettingsDialogProps) {
   const theme = useTheme();
   const savedName = userDisplayName(user) ?? '';
   const [name, setName] = useState(savedName);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<'idle' | 'saved' | 'error'>('idle');
+  const [emblem, setEmblem] = useState<string | null>(userEmblem(user));
+  const [emblemStatus, setEmblemStatus] = useState<'idle' | 'error'>('idle');
 
   // 開くたびに保存済みの名前から始める
-  const reset = () => { setName(userDisplayName(user) ?? ''); setStatus('idle'); };
+  const reset = () => { setName(userDisplayName(user) ?? ''); setStatus('idle'); setEmblem(userEmblem(user)); setEmblemStatus('idle'); };
+
+  // 名前の横のバッジ: アカウントに保存し、Cowork の自分の行にも書く(仲間に見えるように)
+  const saveEmblem = async (id: string | null) => {
+    if (id === emblem) return;
+    setEmblem(id);
+    const { data, error } = await supabase.auth.updateUser({ data: { emblem: id ?? '' } });
+    if (error || !data.user) { setEmblemStatus('error'); return; }
+    setEmblemStatus('idle');
+    onUserUpdated(data.user);
+    // 列がまだ無い(マイグレーション前)などで失敗しても、自分の表示には影響しない
+    await supabase.from('cowork_members').update({ emblem: id }).eq('user_id', user.id);
+  };
 
   const saveName = async () => {
     const trimmed = name.trim();
@@ -174,6 +193,7 @@ export default function SettingsDialog({ open, onClose, user, dark, onUserUpdate
               // 16px 以上(iOS がフォーカス時に拡大しないように)
               sx={{ flex: 1, ml: 2, fontSize: '1.0625rem', '& input': { textAlign: 'right', color: c.sub, p: 0 } }}
             />
+            <NameEmblem id={emblem} size={20} />
             {saving && <CircularProgress size={14} sx={{ ml: 1, color: c.sub }} />}
           </Row>
           {user.email && (
@@ -182,6 +202,29 @@ export default function SettingsDialog({ open, onClose, user, dark, onUserUpdate
               <Typography noWrap sx={{ flex: 1, ml: 2, textAlign: 'right', fontSize: '1.0625rem', color: c.sub }}>{user.email}</Typography>
             </Row>
           )}
+        </Section>
+
+        <Section
+          c={c}
+          header="名前の横のバッジ"
+          footer={
+            emblemStatus === 'error'
+              ? <Box component="span" sx={{ color: 'error.main' }}>バッジを保存できませんでした。もう一度お試しください</Box>
+              : earnedBadges.length === 0
+                ? 'バッジを取ると、ここから 1 つ選べるようになります'
+                : '取ったバッジから 1 つ選ぶと、ユーザー名の横と Cowork の仲間に見えます'
+          }
+        >
+          <Box sx={{ display: 'flex', gap: 1, px: 1.5, py: 1.5, overflowX: 'auto', scrollbarWidth: 'none', '&::-webkit-scrollbar': { display: 'none' } }}>
+            <EmblemOption selected={emblem === null} accent={accent} label="なし" onClick={() => saveEmblem(null)}>
+              <Box sx={{ width: 44, height: 44, borderRadius: '50%', border: `1.5px dashed ${c.sep}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', color: c.sub }}>なし</Box>
+            </EmblemOption>
+            {earnedBadges.map(b => (
+              <EmblemOption key={b.id} selected={emblem === b.id} accent={accent} label={b.name} onClick={() => saveEmblem(b.id)}>
+                <AchievementEmblem badge={b} earned size={44} />
+              </EmblemOption>
+            ))}
+          </Box>
         </Section>
 
         <Section c={c}>
@@ -212,6 +255,24 @@ export default function SettingsDialog({ open, onClose, user, dark, onUserUpdate
 }
 
 type Palette = { cell: string; sep: string; sub: string };
+
+/** 名前の横のバッジの選択肢(選んだものに輪) */
+function EmblemOption({ selected, accent, label, onClick, children }: { selected: boolean; accent: string; label: string; onClick: () => void; children: ReactNode }) {
+  return (
+    <ButtonBase
+      onClick={onClick}
+      aria-pressed={selected}
+      aria-label={label}
+      sx={{
+        flexDirection: 'column', gap: 0.5, p: 0.75, borderRadius: 2, width: 72, flexShrink: 0,
+        boxShadow: selected ? `0 0 0 2px ${accent}` : 'none',
+      }}
+    >
+      {children}
+      <Typography noWrap sx={{ fontSize: '0.58rem', fontWeight: selected ? 800 : 500, width: '100%', textAlign: 'center' }}>{label}</Typography>
+    </ButtonBase>
+  );
+}
 
 function Section({ c, header, footer, children }: { c: Palette; header?: string; footer?: ReactNode; children: ReactNode }) {
   return (

@@ -14,6 +14,7 @@ import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import StarIcon from '@mui/icons-material/Star';
 import ActivityGrid from './ActivityGrid';
+import NameEmblem from './NameEmblem';
 import { coworkDays, coworkStreak, earliestApproved, gridStart, type CoworkGroupView, type CoworkMemberView } from './cowork';
 import { addDays } from './achievements';
 
@@ -102,8 +103,8 @@ export default function CoworkGroupCard({ view, todayStr, onApprove, onReject, o
         {/* 承認待ち(承認できる人にだけ) */}
         {canApprove && pending.map(p => (
           <Box key={p.member.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1, p: 1, borderRadius: 1.5, bgcolor: alpha(theme.palette.warning.main, 0.1) }}>
-            <Typography variant="body2" sx={{ flex: 1, minWidth: 0 }} noWrap>
-              <strong>{p.member.display_name}</strong>({p.habitName})が参加を申請中
+            <Typography component="div" variant="body2" sx={{ flex: 1, minWidth: 0 }} noWrap>
+              <strong>{p.member.display_name}</strong><NameEmblem id={p.member.emblem} size={14} />({p.habitName})が参加を申請中
             </Typography>
             <Button size="small" variant="contained" onClick={() => onApprove(p.member.id)} sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, minWidth: 0 }}>承認</Button>
             <Button size="small" onClick={() => onReject(p.member.id)} sx={{ borderRadius: 2, textTransform: 'none', minWidth: 0, color: 'text.secondary' }}>断る</Button>
@@ -117,7 +118,10 @@ export default function CoworkGroupCard({ view, todayStr, onApprove, onReject, o
             return (
               <Box key={m.member.id} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, width: 60, flexShrink: 0 }}>
                 <MemberDot m={m} done={done} />
-                <Typography sx={{ fontSize: '0.68rem', fontWeight: 700, lineHeight: 1.1, maxWidth: 60 }} noWrap>{m.member.display_name}</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', maxWidth: 60 }}>
+                  <Typography sx={{ fontSize: '0.68rem', fontWeight: 700, lineHeight: 1.1, minWidth: 0 }} noWrap>{m.member.display_name}</Typography>
+                  <NameEmblem id={m.member.emblem} size={12} />
+                </Box>
                 <Typography sx={{ fontSize: '0.6rem', color: 'text.secondary', lineHeight: 1.1, maxWidth: 60 }} noWrap>{m.habitName}</Typography>
               </Box>
             );
@@ -181,6 +185,7 @@ export default function CoworkGroupCard({ view, todayStr, onApprove, onReject, o
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                   <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: m.color }} />
                   <Typography variant="body2" sx={{ fontWeight: 700 }}>{m.member.display_name}</Typography>
+                  <NameEmblem id={m.member.emblem} size={16} />
                   <Typography variant="caption" sx={{ color: 'text.secondary' }}>{m.habitName}・計 {m.set.size}日</Typography>
                 </Box>
                 <ActivityGrid completionsByDate={m.dateMap} onTimeDates={m.onTime} habitColor={m.color} />

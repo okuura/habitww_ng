@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Dialog from '@mui/material/Dialog';
 import ButtonBase from '@mui/material/ButtonBase';
 import Button from '@mui/material/Button';
 import LinearProgress from '@mui/material/LinearProgress';
+import Chip from '@mui/material/Chip';
 import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
 import {
-  CATEGORY_LABEL, TIER_LABEL,
+  CATEGORY_LABEL, TIER_LABEL, daysBetween, nextStep, seriesMembers,
   type AchievementCategory, type AchievementContext, type EvaluatedAchievement, type Tier,
 } from './achievements';
 import AchievementEmblem from './AchievementEmblem';
@@ -109,7 +110,7 @@ export default function AchievementBook({ ctx, achievements }: Props) {
         onClose={() => setSelected(null)}
         PaperProps={{ sx: { borderRadius: 4, width: 'calc(100% - 48px)', maxWidth: 340, m: 3 } }}
       >
-        {selected && <Detail a={selected} isNew={newIds.has(selected.id)} onClose={() => setSelected(null)} />}
+        {selected && <Detail a={selected} all={achievements} ctx={ctx} isNew={newIds.has(selected.id)} onClose={() => setSelected(null)} />}
       </Dialog>
     </>
   );
@@ -229,29 +230,38 @@ function AllBadges({ ctx, achievements, newIds, onSelect }: {
   );
 }
 
-/** メダルケース: 習慣ごとに月間パーフェクトのメダルを棚に並べる(取りたては光る) */
+/** メダルの年間棚: 習慣ごとに 1〜12 月の 12 枠。取った月はメダル、今月は点線で「あと N日」 */
 function MedalCase({ ctx }: { ctx: AchievementContext }) {
   const theme = useTheme();
   const gold = theme.palette.warning.main;
+  const thisYear = ctx.today.getFullYear();
+  const nowKey = thisYear * 12 + ctx.today.getMonth();
+  const [year, setYear] = useState(thisYear);
+  const minYear = Math.min(thisYear, ...ctx.habits.map(h => new Date(h.habit.created_at).getFullYear()));
+  const years = Array.from({ length: thisYear - minYear + 1 }, (_, i) => minYear + i);
+  const total = ctx.habits.reduce((n, h) => n + h.perfectMonths.length, 0);
   const rows = useMemo(
     () => ctx.habits
-      .map(h => ({ habit: h.habit, medals: [...h.perfectMonths].sort((a, b) => b.year - a.year || b.month - a.month) }))
-      .filter(r => r.medals.length > 0)
-      .sort((a, b) => b.medals.length - a.medals.length),
-    [ctx],
+      .map(h => {
+        const created = new Date(h.habit.created_at);
+        // 月の途中で作った習慣は、その月のメダルは取れないので翌月から数える
+        const createdKey = created.getFullYear() * 12 + created.getMonth() + (created.getDate() === 1 ? 0 : 1);
+        return { h, createdKey, months: new Set(h.perfectMonths.filter(m => m.year === year).map(m => m.month)) };
+      })
+      .filter(r => r.createdKey <= year * 12 + 11)
+      .sort((a, b) => b.months.size - a.months.size || a.h.habit.name.localeCompare(b.h.habit.name)),
+    [ctx, year],
   );
   if (rows.length === 0) return null;
-  const total = rows.reduce((n, r) => n + r.medals.length, 0);
-  const fresh = (year: number, month: number) => {
-    const end = new Date(year, month, 0);
-    const days = (ctx.today.getTime() - end.getTime()) / 86400000;
+  const fresh = (y: number, m: number) => {
+    const days = (ctx.today.getTime() - new Date(y, m, 0).getTime()) / 86400000;
     return days >= 0 && days <= FRESH_MEDAL_DAYS;
   };
 
   return (
     <Box
       sx={{
-        mt: 1.5, p: 1.5, pb: 1, borderRadius: 2, border: '1px solid', borderColor: alpha(gold, 0.35),
+        mt: 1.5, p: 1.5, pb: 0.5, borderRadius: 2, border: '1px solid', borderColor: alpha(gold, 0.35),
         background: `linear-gradient(180deg, ${alpha(gold, 0.12)}, ${alpha(gold, 0.03)})`,
       }}
     >
@@ -260,48 +270,109 @@ function MedalCase({ ctx }: { ctx: AchievementContext }) {
         <Typography variant="caption" sx={{ color: 'text.secondary' }}>月の1日から末日まで毎日続けた証</Typography>
         <Typography sx={{ ml: 'auto', fontWeight: 800, fontSize: '0.8rem', color: gold }}>計 {total}枚</Typography>
       </Box>
-      {rows.map(r => (
-        <Box key={r.habit.id} sx={{ mb: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.5 }}>
-            <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: r.habit.color, flexShrink: 0 }} />
-            <Typography noWrap sx={{ fontSize: '0.78rem', fontWeight: 700, minWidth: 0 }}>{r.habit.name}</Typography>
-            <Typography sx={{ fontSize: '0.68rem', fontWeight: 700, color: 'text.secondary', flexShrink: 0 }}>{r.medals.length}枚</Typography>
-          </Box>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, px: 0.5 }}>
-            {r.medals.map(m => {
-              const isFresh = fresh(m.year, m.month);
-              return (
-                <Box
-                  key={`${m.year}-${m.month}`}
-                  title={`${r.habit.name} ${m.year}年${m.month}月`}
-                  sx={{
-                    position: 'relative', lineHeight: 0,
-                    filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.35))',
-                    animation: isFresh ? `${medalGlow} 1.6s ease-in-out infinite` : undefined,
-                  }}
-                >
-                  <Medal color={r.habit.color} value={String(m.month)} unit="月" year={String(m.year)} size={52} shine />
-                  {isFresh && (
-                    <Box component="span" sx={{ position: 'absolute', top: 2, right: -6, px: 0.5, borderRadius: 1, bgcolor: 'error.main', color: '#fff', fontSize: '0.5rem', fontWeight: 800, lineHeight: 1.5 }}>
-                      NEW
-                    </Box>
-                  )}
-                </Box>
-              );
-            })}
-          </Box>
-          {/* 棚板 */}
-          <Box sx={{ height: 4, borderRadius: 2, mt: '2px', mx: 0.25, background: `linear-gradient(90deg, ${alpha(gold, 0.55)}, ${alpha(gold, 0.12)})`, boxShadow: `0 1px 0 ${alpha('#000', 0.25)}` }} />
+      {years.length > 1 && (
+        <Box sx={{ display: 'flex', gap: 0.75, mb: 1.25, flexWrap: 'wrap' }}>
+          {years.map(y => (
+            <Chip
+              key={y} label={`${y}年`} size="small" onClick={() => setYear(y)}
+              sx={{ fontWeight: 700, fontSize: '0.7rem', bgcolor: y === year ? gold : 'action.hover', color: y === year ? '#1a1200' : 'text.secondary', '&:hover': { bgcolor: y === year ? gold : 'action.selected' } }}
+            />
+          ))}
         </Box>
-      ))}
+      )}
+      {rows.map(({ h, createdKey, months }) => {
+        const complete = months.size === 12;
+        return (
+          <Box key={h.habit.id} sx={{ mb: 1.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.5 }}>
+              <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: h.habit.color, flexShrink: 0 }} />
+              <Typography noWrap sx={{ fontSize: '0.78rem', fontWeight: 700, minWidth: 0 }}>{h.habit.name}</Typography>
+              <Typography sx={{ fontSize: '0.68rem', fontWeight: 700, color: complete ? gold : 'text.secondary', flexShrink: 0 }}>{months.size}/12</Typography>
+              {complete && (
+                <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Typography sx={{ fontSize: '0.62rem', fontWeight: 800, color: gold }}>年間パーフェクト</Typography>
+                  <Box sx={{ lineHeight: 0, filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.4))' }}>
+                    <Medal color={gold} value={String(year)} unit="" ribbonColor="#c62828" size={28} shine />
+                  </Box>
+                </Box>
+              )}
+            </Box>
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', rowGap: 0.75, px: 0.25 }}>
+              {/* 上の段(1〜6 月)が全部「作る前」なら、その段は出さない */}
+              {Array.from({ length: 12 }, (_, i) => i + 1).filter(m => !(m <= 6 && year * 12 + 5 < createdKey)).map(m => {
+                const key = year * 12 + (m - 1);
+                const isNow = key === nowKey;
+                let body: ReactNode = null;
+                let caption: string | null = null;
+                if (key < createdKey) {
+                  body = null;
+                } else if (months.has(m)) {
+                  const isFresh = fresh(year, m);
+                  body = (
+                    <Box title={`${h.habit.name} ${year}年${m}月`} sx={{ lineHeight: 0, filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.35))', animation: isFresh ? `${medalGlow} 1.6s ease-in-out infinite` : undefined }}>
+                      <Medal color={h.habit.color} value={String(m)} unit="月" year={String(year)} size={40} shine />
+                    </Box>
+                  );
+                  if (isFresh) caption = 'NEW';
+                } else if (isNow && h.ongoingDaysLeft !== null) {
+                  body = <Medal color={h.habit.color} value={String(m)} unit="月" ongoing size={40} />;
+                  caption = `あと${h.ongoingDaysLeft}日`;
+                } else if (key <= nowKey) {
+                  body = <EmptySlot month={m} strength={isNow ? 0.6 : 0.3} />;
+                  if (isNow) caption = '来月から';
+                } else {
+                  body = <EmptySlot month={m} strength={0.15} />;
+                }
+                return (
+                  <Box key={m} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minHeight: 60 }}>
+                    {body}
+                    {caption && (
+                      <Typography sx={{ fontSize: '0.56rem', fontWeight: 800, lineHeight: 1, mt: '1px', color: caption === 'NEW' ? 'error.main' : h.habit.color }}>{caption}</Typography>
+                    )}
+                  </Box>
+                );
+              })}
+            </Box>
+            {/* 棚板 */}
+            <Box sx={{ height: 4, borderRadius: 2, mt: 0.5, mx: 0.25, background: `linear-gradient(90deg, ${alpha(gold, 0.55)}, ${alpha(gold, 0.12)})`, boxShadow: `0 1px 0 ${alpha('#000', 0.25)}` }} />
+          </Box>
+        );
+      })}
     </Box>
   );
 }
 
-function Detail({ a, isNew, onClose }: { a: EvaluatedAchievement; isNew: boolean; onClose: () => void }) {
+/** まだメダルの無い月の枠(数字だけ) */
+function EmptySlot({ month, strength }: { month: number; strength: number }) {
+  return (
+    <Box sx={{ width: 40, height: 52, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', pb: '3px' }}>
+      <Box
+        sx={{
+          width: 32, height: 32, borderRadius: '50%', border: '1.5px dashed', borderColor: 'text.disabled', opacity: strength,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.66rem', fontWeight: 700, color: 'text.secondary',
+        }}
+      >
+        {month}
+      </Box>
+    </Box>
+  );
+}
+
+/** 取った習慣を出すカテゴリ(習慣ごとに数えるバッジ) */
+const PER_HABIT: AchievementCategory[] = ['streak', 'rank', 'month'];
+
+function Detail({ a, all, ctx, isNew, onClose }: { a: EvaluatedAchievement; all: EvaluatedAchievement[]; ctx: AchievementContext; isNew: boolean; onClose: () => void }) {
   const { earned, earnedDate, current, target, habit } = a.state;
   const secret = a.hidden && !earned;
   const m = METAL[a.tier];
+  const series = secret ? [] : seriesMembers(all, a.id);
+  const step = series.length > 1 ? nextStep(all, a.id) : null;
+  const start = ctx.allCompletionDates[0];
+  const dayNo = earned && earnedDate && start && earnedDate >= start ? daysBetween(start, earnedDate) + 1 : null;
+  const story = [
+    dayNo ? `記録を始めて${dayNo}日目` : null,
+    habit && PER_HABIT.includes(a.category) ? `「${habit.name}」で達成` : null,
+  ].filter(Boolean).join('・');
   return (
     <Box sx={{ p: 3, pb: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
       <AchievementEmblem badge={a} earned={earned} size={96} isNew={isNew} />
@@ -317,7 +388,10 @@ function Detail({ a, isNew, onClose }: { a: EvaluatedAchievement; isNew: boolean
       </Typography>
 
       {earned && earnedDate && (
-        <Typography variant="body2" sx={{ mt: 2, fontWeight: 700 }}>{formatDate(earnedDate)}に獲得</Typography>
+        <Box sx={{ mt: 2 }}>
+          <Typography variant="body2" sx={{ fontWeight: 700 }}>{formatDate(earnedDate)}に獲得</Typography>
+          {story && <Typography variant="caption" sx={{ color: 'text.secondary' }}>{story}</Typography>}
+        </Box>
       )}
       {!earned && !secret && current !== undefined && target && (
         <Box sx={{ mt: 2, width: '100%' }}>
@@ -330,6 +404,32 @@ function Detail({ a, isNew, onClose }: { a: EvaluatedAchievement; isNew: boolean
             value={(current / target) * 100}
             sx={{ height: 8, borderRadius: 4, bgcolor: 'action.hover', '& .MuiLinearProgress-bar': { borderRadius: 4, bgcolor: emblemColor(a.icon) } }}
           />
+        </Box>
+      )}
+
+      {/* 道のり: 同じ系列の梯子と、次の一歩 */}
+      {series.length > 1 && (
+        <Box sx={{ mt: 2, pt: 1.5, width: '100%', borderTop: '1px solid', borderColor: 'divider' }}>
+          <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>道のり</Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', gap: 0.5, mt: 0.75, flexWrap: 'wrap' }}>
+            {series.map(s => (
+              <Box
+                key={s.id}
+                sx={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25, p: 0.5, borderRadius: 1.5, width: 44,
+                  bgcolor: s.id === a.id ? alpha(m.label, 0.15) : 'transparent', boxShadow: s.id === a.id ? `0 0 0 1.5px ${m.label}` : 'none',
+                }}
+              >
+                <AchievementEmblem badge={s} earned={s.state.earned} size={30} hideMark />
+                <Typography noWrap sx={{ fontSize: '0.5rem', fontWeight: 700, width: '100%', color: s.state.earned ? 'text.primary' : 'text.disabled' }}>
+                  {s.mark ?? s.name.replace('カード', '')}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+          <Typography variant="caption" sx={{ display: 'block', mt: 0.75, fontWeight: 700, color: step ? 'text.secondary' : 'warning.main' }}>
+            {step ? step.text : 'この系列はコンプリート！'}
+          </Typography>
         </Box>
       )}
       <Button onClick={onClose} sx={{ mt: 2.5, borderRadius: 2 }}>閉じる</Button>

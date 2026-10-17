@@ -67,6 +67,18 @@ habitww_ng/
   `RankUpEffect.tsx` の全画面演出。実績ページの「カードランク」バッジは同じ素材のミニカード
 - **メダルケース** (`AchievementBook.tsx` の `MedalCase`): 月間パーフェクトのメダルを
   習慣ごとに棚に並べる(金の縁・光が走る。月末から 7 日以内に取ったものは光って NEW)
+- **授与式** (`AwardCeremony.tsx` / `awards.ts`): バッジ・メダルを新しく取ったときの全画面演出。
+  `App.tsx` が記録が変わるたびに `evaluateAll` し、`habitww-awarded`(localStorage)との差分を
+  溜めて、紙吹雪や昇格演出のあとに 1 つずつ出す。初回は今ある分を「見せた」扱いにする
+- **メダルケース(年間棚)** (`AchievementBook.tsx` の `MedalCase`): 習慣ごとに 1〜12 月の 12 枠。
+  取った月はメダル、今月は点線で「あと N日」、逃した月は数字だけ。年の切り替え。12/12 で
+  「年間パーフェクト」。月末から 7 日以内のメダルは光って NEW
+- **名前の横のバッジ(称号)** (`NameEmblem.tsx` / `SettingsDialog.tsx`): 取ったバッジから 1 つ選び
+  `user_metadata.emblem` に保存。設定の名前の横と、Cowork のメンバー名の横(`cowork_members.emblem`
+  に写す。`20261017000000_add_cowork_member_emblem.sql`)に小さく出す
+- **バッジの道のり** (`AchievementBook.tsx` の `Detail`、`achievements.ts` の `seriesOf` / `nextStep`):
+  同じ系列(3日→7日→21日…)の梯子と今の位置、「次は『…』まで あと N日」、「記録を始めて N日目に獲得」、
+  取った習慣(連続・カードランク・月間パーフェクトは最初に達成した習慣を `state.habit` に入れる)
 - **おもちゃ箱** (`ToyBox.tsx` / `toyPhysics.ts`): 実績ページ上部の 🪙 から開く全画面の遊び。
   取ったバッジと月間メダルが箱に落ちてきて、端末の傾き(`deviceorientation`)で転がり、
   振る(`devicemotion`)か「ゆらす」ではね、指でつまんではじける。ぶつかると `navigator.vibrate`。

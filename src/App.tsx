@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { ThemeProvider, useColorScheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
@@ -85,12 +85,15 @@ import ActivityGrid from './ActivityGrid';
 import HabitCardShell from './HabitCardShell';
 import AddHabitDialog from './AddHabitDialog';
 import RankUpEffect, { type RankUp } from './RankUpEffect';
+import { buildContext, evaluateAll } from './achievements';
+import { newAwards, type Award } from './awards';
 import { rarityOf } from './habitStats';
 import LoginPage from './LoginPage';
 
 const StatsPage = lazy(() => import('./StatsPage'));
 const AchievementsPage = lazy(() => import('./AchievementsPage'));
 const HabitTimeDialog = lazy(() => import('./HabitTimeDialog'));
+const AwardCeremony = lazy(() => import('./AwardCeremony'));
 const QRScannerDialog = lazy(() => import('./QRScannerDialog'));
 const CoworkPage = lazy(() => import('./CoworkPage'));
 const CoworkJoinDialog = lazy(() => import('./CoworkJoinDialog'));
@@ -518,6 +521,9 @@ function AppContent() {
   const [newHabitColor, setNewHabitColor] = useState(HABIT_COLORS[0]);
   const [newHabitIdeal, setNewHabitIdeal] = useState('');
   const [rankUp, setRankUp] = useState<RankUp | null>(null);
+  // 授与式: 新しく取ったバッジ・メダル(見せるまで溜める)
+  const [pendingAwards, setPendingAwards] = useState<Award[]>([]);
+  const [awardOpen, setAwardOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState<string | null>(null);
   const [celebrating, setCelebrating] = useState<{ id: string; level: 1 | 2 } | null>(null);
@@ -682,6 +688,29 @@ function AppContent() {
   };
 
   const closeRankUp = useCallback(() => setRankUp(null), []);
+
+  // バッジの判定(授与式と、設定の「名前の横のバッジ」の候補に使う)
+  const evaluation = useMemo(() => {
+    if (loading || !user || habits.length === 0) return null;
+    const ctx = buildContext(habits, completions);
+    return { ctx, evaluated: evaluateAll(ctx) };
+  }, [habits, completions, loading, user]);
+  const earnedBadges = useMemo(() => evaluation?.evaluated.filter(a => a.state.earned) ?? [], [evaluation]);
+
+  // 新しく取れた勲章を見つけて溜める(初回は今ある分を「見せた」扱いにする)
+  useEffect(() => {
+    if (!evaluation) return;
+    const fresh = newAwards(evaluation.ctx, evaluation.evaluated);
+    if (fresh.length > 0) void Promise.resolve().then(() => setPendingAwards(prev => [...prev, ...fresh]));
+  }, [evaluation]);
+
+  // タップ直後の紙吹雪や昇格の演出が終わってから授与式を出す
+  useEffect(() => {
+    if (awardOpen || pendingAwards.length === 0 || rankUp || fever) return;
+    const t = setTimeout(() => setAwardOpen(true), 1500);
+    return () => clearTimeout(t);
+  }, [awardOpen, pendingAwards.length, rankUp, fever]);
+  const closeAwards = useCallback(() => { setAwardOpen(false); setPendingAwards([]); }, []);
 
   const handleToggle = async (habit: Habit) => {
     setToggling(habit.id);
@@ -1006,6 +1035,11 @@ function AppContent() {
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       {fever && <FeverOverlay colors={habits.map(h => h.color)} />}
       {rankUp && <RankUpEffect rankUp={rankUp} onClose={closeRankUp} />}
+      {awardOpen && evaluation && (
+        <Suspense fallback={null}>
+          <AwardCeremony awards={pendingAwards} evaluated={evaluation.evaluated} onClose={closeAwards} />
+        </Suspense>
+      )}
       {/* Shared gradient for flame icons (referenced via fill: url(#fire-grad)) */}
       <svg width={0} height={0} style={{ position: 'absolute' }} aria-hidden focusable="false">
         <defs>
@@ -1580,6 +1614,7 @@ function AppContent() {
           onClose={() => setSettingsOpen(false)}
           user={user}
           dark={darkMode}
+          earnedBadges={earnedBadges}
           onUserUpdated={setUser}
           onSignOut={() => { setSettingsOpen(false); handleSignOut(); }}
           onDeleteAccount={() => setDeleteAccountDialogOpen(true)}

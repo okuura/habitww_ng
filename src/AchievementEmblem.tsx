@@ -36,9 +36,11 @@ interface EmblemProps {
   size?: number;
   /** 新しく取った(光らせる) */
   isNew?: boolean;
+  /** 刻む文字(7日 など)を出さない(名前の横など、小さく出すとき) */
+  hideMark?: boolean;
 }
 
-export default function AchievementEmblem({ badge, earned, size = 56, isNew }: EmblemProps) {
+export default function AchievementEmblem({ badge, earned, size = 56, isNew, hideMark }: EmblemProps) {
   const shape = SHAPE[badge.category];
   const look = { position: 'relative', width: size, height: size, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' } as const;
 
@@ -51,10 +53,10 @@ export default function AchievementEmblem({ badge, earned, size = 56, isNew }: E
     );
   }
   if (shape === 'card') return <MiniCard badge={badge} earned={earned} size={size} isNew={isNew} />;
-  return <Medallion badge={badge} shape={shape} earned={earned} size={size} isNew={isNew} />;
+  return <Medallion badge={badge} shape={shape} earned={earned} size={size} isNew={isNew} hideMark={hideMark} />;
 }
 
-function Medallion({ badge, shape, earned, size, isNew }: { badge: BadgeLook; shape: keyof typeof GEOMETRY; earned: boolean; size: number; isNew?: boolean }) {
+function Medallion({ badge, shape, earned, size, isNew, hideMark }: { badge: BadgeLook; shape: keyof typeof GEOMETRY; earned: boolean; size: number; isNew?: boolean; hideMark?: boolean }) {
   const gid = useId();
   const g = GEOMETRY[shape];
   const metal = METAL[badge.tier];
@@ -140,7 +142,7 @@ function Medallion({ badge, shape, earned, size, isNew }: { badge: BadgeLook; sh
           : <Icon sx={{ fontSize: size * 0.34, opacity: earned ? 1 : 0.55, filter: earned ? `drop-shadow(0 1px 0 ${darken(color, 0.5)})` : undefined }} />}
       </Box>
 
-      {earned && badge.mark && (
+      {earned && badge.mark && !hideMark && (
         <Box
           component="span"
           sx={{

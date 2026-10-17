@@ -11,7 +11,7 @@ import RadioGroup from '@mui/material/RadioGroup';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import CircularProgress from '@mui/material/CircularProgress';
 import type { User } from '@supabase/supabase-js';
-import { supabase, type CoworkGroup, type Habit } from './supabase';
+import { supabase, userEmblem, type CoworkGroup, type Habit } from './supabase';
 import CoworkHabitPicker, { NEW_HABIT } from './CoworkHabitPicker';
 import { displayNameOf } from './cowork';
 
@@ -56,9 +56,13 @@ export default function CoworkCreateDialog({ open, onClose, habits, user, onCrea
       .select()
       .single();
     if (error || !group) { setSaving(false); onError('グループを作れませんでした'); return; }
-    const { error: joinError } = await supabase.rpc('cowork_join', {
+    const { data: memberId, error: joinError } = await supabase.rpc('cowork_join', {
       p_token: (group as CoworkGroup).invite_token, p_habit_id: hid, p_display_name: displayNameOf(user),
     });
+    if (!joinError && memberId && userEmblem(user)) {
+      // 名前の横のバッジも仲間に見せる(列が無ければ失敗するだけ)
+      await supabase.from('cowork_members').update({ emblem: userEmblem(user) }).eq('id', memberId as string);
+    }
     setSaving(false);
     if (joinError) { onError('グループに習慣を登録できませんでした'); return; }
     onCreated(group as CoworkGroup);

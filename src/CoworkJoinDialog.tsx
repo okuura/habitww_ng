@@ -8,7 +8,7 @@ import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import type { User } from '@supabase/supabase-js';
-import { supabase, type CoworkPreview, type Habit } from './supabase';
+import { supabase, userEmblem, type CoworkPreview, type Habit } from './supabase';
 import CoworkHabitPicker, { NEW_HABIT } from './CoworkHabitPicker';
 import { displayNameOf } from './cowork';
 
@@ -42,7 +42,11 @@ export default function CoworkJoinDialog({ token, preview, habits, user, onCreat
       if (!created) { setSaving(false); onError('習慣を作れませんでした'); return; }
       hid = created.id;
     }
-    const { error } = await supabase.rpc('cowork_join', { p_token: token, p_habit_id: hid, p_display_name: displayNameOf(user) });
+    const { data: memberId, error } = await supabase.rpc('cowork_join', { p_token: token, p_habit_id: hid, p_display_name: displayNameOf(user) });
+    if (!error && memberId && userEmblem(user)) {
+      // 名前の横のバッジも仲間に見せる(列が無ければ失敗するだけ)
+      await supabase.from('cowork_members').update({ emblem: userEmblem(user) }).eq('id', memberId as string);
+    }
     setSaving(false);
     if (error) {
       onError(error.code === '23505' ? 'すでにこのグループに参加しています' : '参加できませんでした。もう一度お試しください');

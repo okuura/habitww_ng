@@ -59,8 +59,8 @@ export interface AchievementContext {
   timed: { habitId: string; date: string; hour: number; minute: number }[];
   /** その日にある習慣を全部実施した日(昇順) */
   perfectDays: string[];
-  /** 月間パーフェクトの月末日(昇順)と月 */
-  perfectMonthEnds: { date: string; month: number }[];
+  /** 月間パーフェクトの月末日(昇順)と月、取った習慣 */
+  perfectMonthEnds: { date: string; month: number; habitId: string }[];
 }
 
 export function buildContext(habits: Habit[], completions: HabitCompletion[], now = new Date()): AchievementContext {
@@ -119,8 +119,8 @@ export function buildContext(habits: Habit[], completions: HabitCompletion[], no
   });
 
   const perfectMonthEnds = data
-    .flatMap(h => h.perfectMonths)
-    .map(m => ({ date: toLocalDateString(new Date(m.year, m.month, 0)), month: m.month }))
+    .flatMap(h => h.perfectMonths.map(m => ({ ...m, habitId: h.habit.id })))
+    .map(m => ({ date: toLocalDateString(new Date(m.year, m.month, 0)), month: m.month, habitId: m.habitId }))
     .sort((a, b) => (a.date < b.date ? -1 : 1));
 
   const sortedDates = (list: HabitCompletion[]) => list.map(c => c.completed_date).sort();
@@ -199,13 +199,24 @@ const best = (ctx: AchievementContext, score: (h: HabitData) => number) =>
 
 const earliest = (dates: (string | undefined)[]) => dates.filter((d): d is string => !!d).sort()[0];
 
+/** 習慣ごとの「達成した日」から、一番早く達成した習慣と日 */
+const firstAchiever = (ctx: AchievementContext, dateOf: (h: HabitData) => string | undefined) => {
+  let date: string | undefined;
+  let habit: Habit | undefined;
+  for (const h of ctx.habits) {
+    const d = dateOf(h);
+    if (d && (!date || d < date)) { date = d; habit = h.habit; }
+  }
+  return { date, habit };
+};
+
 const streak = (n: number, name: string, tier: Tier): Achievement => ({
   id: `streak-${n}`, category: 'streak', name, tier, icon: 'fire', mark: `${n}日`,
   hint: `どれかの習慣を${n}日連続で実施する`,
   evaluate: ctx => {
-    const date = earliest(ctx.habits.flatMap(h => h.runs.filter(r => r.len >= n).map(r => addDays(r.start, n - 1))));
+    const first = firstAchiever(ctx, h => earliest(h.runs.filter(r => r.len >= n).map(r => addDays(r.start, n - 1))));
     const top = best(ctx, h => h.currentStreak);
-    return { earned: !!date, earnedDate: date, current: Math.min(top?.currentStreak ?? 0, n), target: n, habit: top?.habit };
+    return { earned: !!first.date, earnedDate: first.date, current: Math.min(top?.currentStreak ?? 0, n), target: n, habit: first.date ? first.habit : top?.habit };
   },
 });
 
@@ -221,9 +232,9 @@ const rank = (rarity: Exclude<Rarity, 'normal'>, name: string, tier: Tier): Achi
     id: `rank-${rarity}`, category: 'rank', name, tier, icon: `rank-${rarity}`,
     hint: `どれかの習慣を累計${card.min}日実施して、カードを${card.label}にする`,
     evaluate: ctx => {
-      const date = earliest(ctx.habits.map(h => nth(h.dates, card.min)));
+      const first = firstAchiever(ctx, h => nth(h.dates, card.min));
       const top = best(ctx, h => h.dates.length);
-      return { earned: !!date, earnedDate: date, current: Math.min(top?.dates.length ?? 0, card.min), target: card.min, habit: top?.habit };
+      return { earned: !!first.date, earnedDate: first.date, current: Math.min(top?.dates.length ?? 0, card.min), target: card.min, habit: first.date ? first.habit : top?.habit };
     },
   };
 };
@@ -231,7 +242,10 @@ const rank = (rarity: Exclude<Rarity, 'normal'>, name: string, tier: Tier): Achi
 const months = (n: number, name: string, tier: Tier): Achievement => ({
   id: `month-${n}`, category: 'month', name, tier, icon: 'calendar', mark: `${n}`,
   hint: n === 1 ? 'どれかの習慣を、ある月の1日から末日まで毎日実施する' : `月間パーフェクトを${n}回取る(習慣ごとに数える)`,
-  evaluate: ctx => counted(ctx.perfectMonthEnds.map(m => m.date), n),
+  evaluate: ctx => {
+    const hit = ctx.perfectMonthEnds[n - 1];
+    return { ...counted(ctx.perfectMonthEnds.map(m => m.date), n), habit: hit ? ctx.habits.find(h => h.habit.id === hit.habitId)?.habit : undefined };
+  },
 });
 
 const season = (id: string, name: string, icon: string, monthsIn: number[], label: string): Achievement => ({
@@ -412,6 +426,35 @@ export interface EvaluatedAchievement extends Achievement {
 
 export function evaluateAll(ctx: AchievementContext): EvaluatedAchievement[] {
   return ACHIEVEMENTS.map(a => ({ ...a, state: a.evaluate(ctx) }));
+}
+
+// --- 系列(同じ種類のバッジの梯子) ----------------------------------------------
+
+/** バッジの系列名(streak / total / perfect-day …)。段階の無いバッジは null */
+export function seriesOf(id: string): string | null {
+  if (id.startsWith('rank-')) return 'rank';
+  const m = id.match(/^(.*)-(\d+)$/);
+  if (!m || m[1] === 'bacchiri-streak') return null;
+  return m[1];
+}
+
+/** 同じ系列のバッジ(定義順 = 易しい順) */
+export function seriesMembers(all: EvaluatedAchievement[], id: string): EvaluatedAchievement[] {
+  const s = seriesOf(id);
+  return s ? all.filter(a => seriesOf(a.id) === s) : [];
+}
+
+/** 「あと N日」の単位 */
+export const unitOf = (category: AchievementCategory) =>
+  category === 'month' ? '枚' : ['streak', 'perfectDay', 'comeback', 'anniversary', 'rank'].includes(category) ? '日' : '回';
+
+/** 系列の次の一歩(「次は『一週間』まで あと 4日」)。系列が無い・全部取っていれば null */
+export function nextStep(all: EvaluatedAchievement[], id: string): { next: EvaluatedAchievement; text: string } | null {
+  const next = seriesMembers(all, id).find(a => !a.state.earned);
+  if (!next) return null;
+  const { current, target } = next.state;
+  const left = target && current !== undefined ? target - current : null;
+  return { next, text: left !== null ? `次は『${next.name}』まで あと${left}${unitOf(next.category)}` : `次は『${next.name}』` };
 }
 
 // --- もうすぐ取れる -------------------------------------------------------------

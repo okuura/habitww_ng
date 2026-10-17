@@ -12,6 +12,12 @@ export function userDisplayName(user: User | null | undefined): string | undefin
   return (meta?.display_name as string | undefined)?.trim() || (meta?.name as string | undefined) || undefined;
 }
 
+/** 名前の横に出すバッジ(実績の id)。設定で選ぶ。無ければ null */
+export function userEmblem(user: User | null | undefined): string | null {
+  const v = user?.user_metadata?.emblem;
+  return typeof v === 'string' && v ? v : null;
+}
+
 // ---------------------------------------------------------------------------
 // Startup fast path
 //
@@ -163,6 +169,8 @@ export interface CoworkMember {
   status: 'pending' | 'approved';
   joined_at: string;
   approved_at: string | null;
+  /** 名前の横に出すバッジ(実績の id)。列が無い(マイグレーション前)なら undefined */
+  emblem?: string | null;
 }
 
 /** 参加前の下見(RPC cowork_preview の戻り) */
