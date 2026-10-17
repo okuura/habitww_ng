@@ -8,7 +8,7 @@ import InputBase from '@mui/material/InputBase';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
 import { useTheme } from '@mui/material/styles';
-import type { User } from '@supabase/supabase-js';
+import type { AuthError, User } from '@supabase/supabase-js';
 import { supabase, userDisplayName, userEmblem } from './supabase';
 import type { EvaluatedAchievement } from './achievements';
 import AchievementEmblem from './AchievementEmblem';
@@ -42,21 +42,38 @@ export default function SettingsDialog({ open, onClose, user, dark, earnedBadges
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<'idle' | 'saved' | 'error'>('idle');
   const [emblem, setEmblem] = useState<string | null>(userEmblem(user));
-  const [emblemStatus, setEmblemStatus] = useState<'idle' | 'error'>('idle');
+  const [emblemError, setEmblemError] = useState<string | null>(null);
 
   // 開くたびに保存済みの名前から始める
-  const reset = () => { setName(userDisplayName(user) ?? ''); setStatus('idle'); setEmblem(userEmblem(user)); setEmblemStatus('idle'); };
+  const reset = () => { setName(userDisplayName(user) ?? ''); setStatus('idle'); setEmblem(userEmblem(user)); setEmblemError(null); };
 
   // 名前の横のバッジ: アカウントに保存し、Cowork の自分の行にも書く(仲間に見えるように)
   const saveEmblem = async (id: string | null) => {
     if (id === emblem) return;
+    const prev = emblem;
     setEmblem(id);
-    const { data, error } = await supabase.auth.updateUser({ data: { emblem: id ?? '' } });
-    if (error || !data.user) { setEmblemStatus('error'); return; }
-    setEmblemStatus('idle');
-    onUserUpdated(data.user);
+    setEmblemError(null);
+    const payload = { data: { emblem: id ?? '' } };
+    let res: Awaited<ReturnType<typeof supabase.auth.updateUser>>;
+    try {
+      res = await supabase.auth.updateUser(payload);
+      if (res.error) {
+        // 手元のセッションが古いと失敗することがあるので、取り直してもう一度
+        await supabase.auth.refreshSession();
+        res = await supabase.auth.updateUser(payload);
+      }
+    } catch (e) {
+      res = { data: { user: null }, error: e as AuthError };
+    }
+    if (res.error || !res.data.user) {
+      setEmblem(prev);
+      setEmblemError(res.error?.message || '不明なエラー');
+      return;
+    }
+    onUserUpdated(res.data.user);
     // 列がまだ無い(マイグレーション前)などで失敗しても、自分の表示には影響しない
-    await supabase.from('cowork_members').update({ emblem: id }).eq('user_id', user.id);
+    const { error: memberError } = await supabase.from('cowork_members').update({ emblem: id }).eq('user_id', user.id);
+    if (memberError) console.warn('cowork_members.emblem を更新できませんでした', memberError.message);
   };
 
   const saveName = async () => {
@@ -208,8 +225,8 @@ export default function SettingsDialog({ open, onClose, user, dark, earnedBadges
           c={c}
           header="名前の横のバッジ"
           footer={
-            emblemStatus === 'error'
-              ? <Box component="span" sx={{ color: 'error.main' }}>バッジを保存できませんでした。もう一度お試しください</Box>
+            emblemError
+              ? <Box component="span" sx={{ color: 'error.main' }}>バッジを保存できませんでした({emblemError})。もう一度お試しください</Box>
               : earnedBadges.length === 0
                 ? 'バッジを取ると、ここから 1 つ選べるようになります'
                 : '取ったバッジから 1 つ選ぶと、ユーザー名の横と Cowork の仲間に見えます'
