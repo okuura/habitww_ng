@@ -50,9 +50,11 @@ const shortDate = (ds: string) => {
 interface Props {
   ctx: AchievementContext;
   achievements: EvaluatedAchievement[];
+  /** おもちゃ箱を開く(取ったものが 1 つも無ければ undefined でボタンを出さない) */
+  onOpenToyBox?: () => void;
 }
 
-export default function AchievementBook({ ctx, achievements }: Props) {
+export default function AchievementBook({ ctx, achievements, onOpenToyBox }: Props) {
   const earned = useMemo(() => achievements.filter(a => a.state.earned), [achievements]);
   const earnedKey = earned.map(a => a.id).join(',');
 
@@ -90,7 +92,7 @@ export default function AchievementBook({ ctx, achievements }: Props) {
 
   return (
     <>
-      <Header earned={earned.length} total={achievements.length} />
+      <Header earned={earned.length} total={achievements.length} onOpenToyBox={onOpenToyBox} />
       <TierTally achievements={achievements} />
 
       <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', display: 'block', mt: 2, mb: 1 }}>
@@ -116,12 +118,29 @@ export default function AchievementBook({ ctx, achievements }: Props) {
   );
 }
 
-function Header({ earned, total }: { earned: number; total: number }) {
+function Header({ earned, total, onOpenToyBox }: { earned: number; total: number; onOpenToyBox?: () => void }) {
   return (
     <>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
         <WorkspacePremiumIcon sx={{ color: 'warning.main', fontSize: 20 }} />
         <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary', flex: 1 }}>バッジ図鑑</Typography>
+        {/* おもちゃ箱: 取ったバッジとメダルで遊ぶ */}
+        {onOpenToyBox && (
+          <Box
+            role="button"
+            aria-label="おもちゃ箱"
+            onClick={onOpenToyBox}
+            sx={{
+              display: 'flex', alignItems: 'center', gap: 0.5, height: 28, pl: 0.75, pr: 1.25, borderRadius: 999,
+              fontSize: '0.75rem', fontWeight: 700, lineHeight: 1, cursor: 'pointer', userSelect: 'none',
+              bgcolor: 'action.hover', color: 'text.primary',
+              '&:active': { transform: 'scale(0.95)' },
+            }}
+          >
+            <Box component="span" sx={{ fontSize: '1rem' }}>🪙</Box>
+            おもちゃ箱
+          </Box>
+        )}
         <Typography sx={{ fontWeight: 800, fontSize: '0.95rem' }}>
           {earned}<Box component="span" sx={{ color: 'text.secondary', fontWeight: 600, fontSize: '0.75rem' }}> / {total}</Box>
         </Typography>

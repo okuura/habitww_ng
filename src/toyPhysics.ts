@@ -1,6 +1,6 @@
 // おもちゃ箱の物理(UI を持たない純粋な関数)。
 // 箱の中で円が重力に引かれて落ち、壁と互いにぶつかって転がる。見た目は ToyBox が描く。
-// 単位は px と秒。重力の向きは外から渡す(端末の傾き)
+// 単位は px と秒。重力の向きは外から渡す(今は常に下。昔は端末の傾きだった)
 
 export interface Body {
   id: string;
@@ -268,4 +268,80 @@ export function release(b: Body) {
   b.sleep = 0;
   clampSpeed(b);
   b.spin += b.vx / b.r * 0.2;
+}
+
+/** 棚に並べたときの 1 つの位置 */
+export interface Slot { id: string; x: number; y: number }
+
+interface ShelfItem { id: string; r: number; /** 円の上にはみ出す飾り(メダルのリボン)の分、上に空ける */ top?: number }
+
+/**
+ * 棚のように、上から順に行で詰めて並べる。行ごとに左右中央、行の高さはその行の一番大きい物体。
+ * 高さに収まらないときは間隔を縮めて(重なってよい)、縮めても入らない分は下にはみ出す
+ */
+export function shelfLayout(items: ShelfItem[], width: number, height: number, gap = 6, pad = 10): Slot[] {
+  if (items.length === 0) return [];
+  const pack = (scale: number) => {
+    const rows: { items: ShelfItem[]; w: number; h: number; top: number }[] = [];
+    let row: { items: ShelfItem[]; w: number; h: number; top: number } | null = null;
+    for (const it of items) {
+      const w = (it.r * 2 + gap) * scale;
+      if (!row || row.w + w > width - pad * 2) {
+        row = { items: [], w: 0, h: 0, top: 0 };
+        rows.push(row);
+      }
+      row.items.push(it);
+      row.w += w;
+      row.top = Math.max(row.top, (it.top ?? 0) * scale);
+      row.h = Math.max(row.h, (it.r * 2 + gap) * scale + (it.top ?? 0) * scale);
+    }
+    return rows;
+  };
+  const total = (rows: { h: number }[]) => rows.reduce((s, r) => s + r.h, 0);
+  const fits = (scale: number) => total(pack(scale)) <= height - pad * 2;
+  let scale = 1;
+  if (!fits(1)) {
+    // 間隔を縮めると 1 行に入る数も増えるので、収まる一番大きい倍率を二分探索で探す
+    let lo = 0.55;
+    let hi = 1;
+    if (fits(lo)) {
+      for (let i = 0; i < 10; i++) {
+        const mid = (lo + hi) / 2;
+        if (fits(mid)) lo = mid; else hi = mid;
+      }
+    }
+    scale = lo;
+  }
+  const rows = pack(scale);
+  const slots: Slot[] = [];
+  let y = pad;
+  for (const r of rows) {
+    let x = (width - r.w) / 2;
+    for (const it of r.items) {
+      const w = (it.r * 2 + gap) * scale;
+      slots.push({ id: it.id, x: x + w / 2, y: y + r.top + (r.h - r.top) / 2 });
+      x += w;
+    }
+    y += r.h;
+  }
+  return slots;
+}
+
+/** 指でなぞった線分(p0→p1)の近くにある物体を、指の速さで押す。崩すときに使う */
+export function sweep(world: World, p0: Vec, p1: Vec, v: Vec, slack = 14) {
+  const dx = p1.x - p0.x;
+  const dy = p1.y - p0.y;
+  const len2 = dx * dx + dy * dy;
+  for (const b of world.bodies) {
+    if (b.held) continue;
+    const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((b.x - p0.x) * dx + (b.y - p0.y) * dy) / len2));
+    const cx = p0.x + dx * t;
+    const cy = p0.y + dy * t;
+    if (Math.hypot(b.x - cx, b.y - cy) > b.r + slack) continue;
+    b.sleep = 0;
+    b.vx = b.vx * 0.3 + v.x * 0.8;
+    b.vy = b.vy * 0.3 + v.y * 0.8;
+    b.spin += (v.x / b.r) * 0.15;
+    clampSpeed(b);
+  }
 }

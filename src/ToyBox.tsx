@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
@@ -7,6 +7,7 @@ import Dialog from '@mui/material/Dialog';
 import CircularProgress from '@mui/material/CircularProgress';
 import CloseIcon from '@mui/icons-material/Close';
 import VibrationIcon from '@mui/icons-material/Vibration';
+import GridViewIcon from '@mui/icons-material/GridView';
 import IosShareIcon from '@mui/icons-material/IosShare';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import { keyframes } from '@emotion/react';
@@ -15,7 +16,7 @@ import { SHAPE } from './achievementIcons';
 import AchievementEmblem from './AchievementEmblem';
 import { Medal } from './Badges';
 import {
-  addBody, clear, createWorld, grab, impulseAll, moveHeld, pick, release, step, wakeAll,
+  addBody, clear, createWorld, grab, impulseAll, moveHeld, pick, release, shelfLayout, step, sweep, wakeAll,
   type Body, type Vec, type World,
 } from './toyPhysics';
 import {
@@ -23,8 +24,9 @@ import {
   type ToyItem, type ToyMedal,
 } from './toyShare';
 
-// おもちゃ箱: 取ったバッジとメダルが箱の中に落ちてきて、傾ける・振る・指ではじいて遊べる。
-// 「積み上げタワー」は、足場の上に 1 つずつ落として何個積めるか。箱の様子は画像にしてシェアできる。
+// おもちゃ箱: 取ったバッジとメダルが棚のように整然と並んでいて、指でなぞるか「ゆらす」で崩せる。
+// 崩れたあとは指でつまんではじける。「積み上げタワー」は、足場の上に 1 つずつ落として何個積めるか。
+// 箱の様子は画像にしてシェアできる。端末の傾き・振りのセンサーは使わない(iOS の許可ダイアログを出さない)。
 // 物理は toyPhysics、画像は toyShare。ここは描画と入力
 
 export type { ToyMedal } from './toyShare';
@@ -41,13 +43,15 @@ type Mode = 'free' | 'tower';
 
 const BADGE_SIZE = 56;
 const MEDAL_WIDTH = 40;
-/** 落ちてくる間隔(ms) */
-const SPAWN_INTERVAL = 45;
 /** これより強くぶつかったら振動 */
 const HAPTIC_MIN = 260;
 const HAPTIC_STRONG = 900;
-/** 振ったと判断する加速度(重力抜き、m/s²) */
-const SHAKE_ACCEL = 14;
+/** 棚に並んでいるとき、これだけ指が動いたら「崩す」 */
+const SWEEP_START = 10;
+/** なぞる速さの上限(px/s) */
+const SWEEP_MAX = 1800;
+/** 重力は常に下 */
+const DOWN: Vec = { x: 0, y: 1 };
 /** タワーの足場の幅と、底からの高さ */
 const PLATFORM_WIDTH = 170;
 const PLATFORM_LIFT = 110;
@@ -95,14 +99,14 @@ interface TowerState {
 }
 
 export default function ToyBox({ badges, totalBadges, medals, onClose }: Props) {
-  const items = useMemo<(ToyItem & { node: ReactNode })[]>(() => [
+  const items = useMemo<(ToyItem & { node: ReactNode; top?: number })[]>(() => [
     ...badges.map(b => ({
       id: `b-${b.id}`, kind: 'badge' as const, badge: b,
       r: SHAPE[b.category] === 'trophy' ? 32 : 28,
       node: <AchievementEmblem badge={b} earned size={BADGE_SIZE} />,
     })),
     ...medals.map(m => ({
-      id: `m-${m.habit.id}-${m.year}-${m.month}`, kind: 'medal' as const, medal: m, r: 22,
+      id: `m-${m.habit.id}-${m.year}-${m.month}`, kind: 'medal' as const, medal: m, r: 22, top: 12,
       node: <Medal color={m.habit.color} value={String(m.month)} unit="月" year={String(m.year)} size={MEDAL_WIDTH} />,
     })),
   ], [badges, medals]);
@@ -112,14 +116,16 @@ export default function ToyBox({ badges, totalBadges, medals, onClose }: Props) 
   const boxRef = useRef<HTMLDivElement>(null);
   const elRefs = useRef(new Map<string, HTMLDivElement>());
   const worldRef = useRef<World | null>(null);
-  const gravityRef = useRef<Vec>({ x: 0, y: 1 });
   const heldRef = useRef<{ body: Body; pointerId: number; last: number } | null>(null);
   const modeRef = useRef<Mode>('free');
-  const spawnRef = useRef({ idx: 0, at: 0 });
+  /** 棚に並んだまま(物理を止めている) */
+  const shelvedRef = useRef(true);
+  /** 棚を崩すなぞり(指を置いた位置と、直前の位置) */
+  const sweepRef = useRef<{ pointerId: number; startX: number; startY: number; x: number; y: number; t: number } | null>(null);
   const towerRef = useRef<TowerState>({ queue: [], current: null, aimX: 0, nextAt: 0, fallenAt: null, done: false });
 
   const [mode, setMode] = useState<Mode>('free');
-  const [hasSensors, setHasSensors] = useState(false);
+  const [shelved, setShelved] = useState(true);
   const [best, setBest] = useState(readBest);
   const [towerLive, setTowerLive] = useState(0);
   const [result, setResult] = useState<{ score: number; best: number; isBest: boolean } | null>(null);
@@ -132,21 +138,49 @@ export default function ToyBox({ badges, totalBadges, medals, onClose }: Props) 
     for (const el of elRefs.current.values()) el.style.transform = 'translate(-999px, -999px)';
   };
 
+  /** 棚に並べる(全部を置き直して、物理を止める) */
+  const shelve = useCallback((world: World) => {
+    heldRef.current = null;
+    sweepRef.current = null;
+    clear(world);
+    for (const slot of shelfLayout(items, world.width, world.height)) {
+      const it = itemById.get(slot.id)!;
+      addBody(world, { id: it.id, r: it.r, x: slot.x, y: slot.y });
+    }
+    shelvedRef.current = true;
+    setShelved(true);
+  }, [items, itemById]);
+  /** 棚を崩す(物理を動かし始める) */
+  const unshelve = (world: World) => {
+    if (!shelvedRef.current) return;
+    shelvedRef.current = false;
+    setShelved(false);
+    wakeAll(world);
+  };
+
   const shake = () => {
     const world = worldRef.current;
     if (!world || modeRef.current !== 'free') return;
-    impulseAll(world, 650, gravityRef.current);
+    unshelve(world);
+    impulseAll(world, 650, DOWN);
     vibrate([15, 30, 15]);
   };
+  const rearrange = () => {
+    const world = worldRef.current;
+    if (!world || modeRef.current !== 'free') return;
+    hideAll();
+    shelve(world);
+    vibrate(10);
+  };
 
-  // 物理のループ。自由モードは物体を時間差で上から落とし、タワーは 1 つずつ指で落とす
+  // 物理のループ。自由モードは棚に並べて止めておき、崩されたら動かす。タワーは 1 つずつ指で落とす
   useEffect(() => {
     const box = boxRef.current;
     if (!box) return;
     const world = createWorld(box.clientWidth, box.clientHeight);
     worldRef.current = world;
+    shelve(world);
     const start = performance.now();
-    spawnRef.current = { idx: 0, at: start + 150 };
     let last = start;
     let lastHaptic = 0;
     let lastLive = -1;
@@ -156,18 +190,7 @@ export default function ToyBox({ badges, totalBadges, medals, onClose }: Props) 
       const dt = Math.min(0.033, (now - last) / 1000);
       last = now;
 
-      if (modeRef.current === 'free') {
-        const sp = spawnRef.current;
-        while (sp.idx < items.length && now >= sp.at) {
-          const it = items[sp.idx++];
-          addBody(world, {
-            id: it.id, r: it.r,
-            x: it.r + Math.random() * Math.max(1, world.width - 2 * it.r), y: it.r + 1,
-            vx: (Math.random() - 0.5) * 160, vy: 160, angle: Math.random() * Math.PI * 2,
-          });
-          sp.at += SPAWN_INTERVAL;
-        }
-      } else {
+      if (modeRef.current === 'tower') {
         const t = towerRef.current;
         if (!t.done) {
           if (!t.current && t.queue.length > 0 && now >= t.nextAt) {
@@ -198,12 +221,12 @@ export default function ToyBox({ badges, totalBadges, medals, onClose }: Props) 
         }
       }
 
-      // タワーが終わったら止める(点数とシェア画像が食い違わないように)
-      const frozen = modeRef.current === 'tower' && towerRef.current.done;
+      // 棚に並んでいる間と、タワーが終わったあとは止める(点数とシェア画像が食い違わないように)
+      const frozen = modeRef.current === 'free' ? shelvedRef.current : towerRef.current.done;
       let strongest = 0;
       if (!frozen) {
         for (let s = 0; s < 2; s++) {
-          for (const hit of step(world, dt / 2, gravityRef.current)) if (hit.strength > strongest) strongest = hit.strength;
+          for (const hit of step(world, dt / 2, DOWN)) if (hit.strength > strongest) strongest = hit.strength;
         }
       }
       for (const b of world.bodies) {
@@ -225,6 +248,7 @@ export default function ToyBox({ badges, totalBadges, medals, onClose }: Props) 
         world.platform = platformFor(world);
         setPlatform(platformBox(world));
       }
+      if (modeRef.current === 'free' && shelvedRef.current) shelve(world);
       wakeAll(world);
     });
     ro.observe(box);
@@ -233,44 +257,7 @@ export default function ToyBox({ badges, totalBadges, medals, onClose }: Props) 
       ro.disconnect();
       worldRef.current = null;
     };
-  }, [items]);
-
-  // 端末の傾き(重力の向き)と、振り
-  useEffect(() => {
-    let lastShake = 0;
-    let lastG: Vec = { x: 0, y: 1 };
-    const rad = Math.PI / 180;
-    const onOrient = (e: DeviceOrientationEvent) => {
-      if (e.beta === null || e.gamma === null) return;
-      // 縦持ち: 左右の傾き(gamma)で横に、前後の傾き(beta)で縦に重力がかかる
-      const g = { x: Math.sin(e.gamma * rad), y: Math.sin(e.beta * rad) };
-      setHasSensors(true);
-      if (Math.hypot(g.x - lastG.x, g.y - lastG.y) > 0.12) {
-        lastG = g;
-        if (worldRef.current) wakeAll(worldRef.current);
-      }
-      gravityRef.current = g;
-    };
-    const onMotion = (e: DeviceMotionEvent) => {
-      if (modeRef.current !== 'free') return;
-      const a = e.acceleration;
-      if (!a || a.x === null || a.y === null) return;
-      const m = Math.hypot(a.x, a.y, a.z ?? 0);
-      const now = performance.now();
-      if (m > SHAKE_ACCEL && now - lastShake > 400) {
-        lastShake = now;
-        const world = worldRef.current;
-        if (world) impulseAll(world, Math.min(1100, 400 + m * 30), gravityRef.current);
-        vibrate([15, 30, 15]);
-      }
-    };
-    window.addEventListener('deviceorientation', onOrient);
-    window.addEventListener('devicemotion', onMotion);
-    return () => {
-      window.removeEventListener('deviceorientation', onOrient);
-      window.removeEventListener('devicemotion', onMotion);
-    };
-  }, []);
+  }, [items, shelve]);
 
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview.url); }, [preview]);
 
@@ -287,6 +274,7 @@ export default function ToyBox({ badges, totalBadges, medals, onClose }: Props) 
     const world = worldRef.current;
     if (!world) return;
     heldRef.current = null;
+    sweepRef.current = null;
     clear(world);
     hideAll();
     world.platform = platformFor(world);
@@ -302,13 +290,11 @@ export default function ToyBox({ badges, totalBadges, medals, onClose }: Props) 
   const backToFree = () => {
     const world = worldRef.current;
     if (!world) return;
-    heldRef.current = null;
-    clear(world);
     hideAll();
     world.platform = null;
     setPlatform(null);
-    spawnRef.current = { idx: 0, at: performance.now() + 150 };
     modeRef.current = 'free';
+    shelve(world);
     setMode('free');
     setResult(null);
   };
@@ -360,6 +346,12 @@ export default function ToyBox({ badges, totalBadges, medals, onClose }: Props) 
       aimTower(x);
       return;
     }
+    if (shelvedRef.current) {
+      // 棚に並んでいる間は、つまむのではなく、なぞって崩す
+      e.currentTarget.setPointerCapture(e.pointerId);
+      sweepRef.current = { pointerId: e.pointerId, startX: x, startY: y, x, y, t: performance.now() };
+      return;
+    }
     if (heldRef.current) return;
     const body = pick(world, x, y);
     if (!body) return;
@@ -369,9 +361,27 @@ export default function ToyBox({ badges, totalBadges, medals, onClose }: Props) 
     vibrate(6);
   };
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-    const held = heldRef.current;
     const world = worldRef.current;
-    if (!held || !world || held.pointerId !== e.pointerId) return;
+    if (!world) return;
+    const sw = sweepRef.current;
+    if (sw && sw.pointerId === e.pointerId) {
+      const { x, y } = localPos(e);
+      const now = performance.now();
+      const dt = Math.max(0.004, (now - sw.t) / 1000);
+      if (shelvedRef.current) {
+        if (Math.hypot(x - sw.startX, y - sw.startY) < SWEEP_START) return;
+        unshelve(world);
+        vibrate([10, 20, 10]);
+      }
+      const v = { x: (x - sw.x) / dt, y: (y - sw.y) / dt };
+      const speed = Math.hypot(v.x, v.y);
+      if (speed > SWEEP_MAX) { v.x *= SWEEP_MAX / speed; v.y *= SWEEP_MAX / speed; }
+      sweep(world, { x: sw.x, y: sw.y }, { x, y }, v);
+      sw.x = x; sw.y = y; sw.t = now;
+      return;
+    }
+    const held = heldRef.current;
+    if (!held || held.pointerId !== e.pointerId) return;
     const { x, y } = localPos(e);
     if (modeRef.current === 'tower') { aimTower(x); return; }
     const now = performance.now();
@@ -379,6 +389,7 @@ export default function ToyBox({ badges, totalBadges, medals, onClose }: Props) 
     held.last = now;
   };
   const onPointerEnd = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (sweepRef.current?.pointerId === e.pointerId) { sweepRef.current = null; return; }
     const held = heldRef.current;
     if (!held || held.pointerId !== e.pointerId) return;
     heldRef.current = null;
@@ -506,8 +517,13 @@ export default function ToyBox({ badges, totalBadges, medals, onClose }: Props) 
         {mode === 'free' ? (
           <>
             <Typography variant="caption" sx={{ flex: 1, color: 'rgba(255,255,255,0.6)' }}>
-              {hasSensors ? '傾ける・振る・指でつまんではじく' : '指でつまんで、はじく'}
+              {shelved ? 'なぞるか、ゆらすと崩れる' : '指でつまんで、はじく'}
             </Typography>
+            {!shelved && (
+              <IconButton aria-label="並べ直す" onClick={rearrange} sx={{ color: 'rgba(255,255,255,0.8)', border: '1px solid rgba(255,255,255,0.35)', borderRadius: 2, p: '5px' }}>
+                <GridViewIcon fontSize="small" />
+              </IconButton>
+            )}
             <Button variant="outlined" color="inherit" startIcon={<VibrationIcon />} onClick={shake} sx={{ borderRadius: 2, borderColor: 'rgba(255,255,255,0.35)', textTransform: 'none', fontWeight: 700 }}>
               ゆらす
             </Button>

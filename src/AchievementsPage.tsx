@@ -13,16 +13,6 @@ import { buildContext, evaluateAll, nearGoals } from './achievements';
 
 const ToyBox = lazy(() => import('./ToyBox'));
 
-/** iOS は傾き・振りのセンサーに許可が要る(ユーザー操作の中で呼ぶ)。拒否されても遊べる */
-async function requestMotionPermission() {
-  const w = window as unknown as Record<string, { requestPermission?: () => Promise<string> } | undefined>;
-  for (const ev of [w.DeviceMotionEvent, w.DeviceOrientationEvent]) {
-    if (ev && typeof ev.requestPermission === 'function') {
-      try { await ev.requestPermission(); } catch { /* 許可されなくても指で遊べる */ }
-    }
-  }
-}
-
 // 実績ページ: これまでの実績(ドット)、もうすぐ取れるバッジ、バッジ図鑑
 
 interface AchievementsPageProps {
@@ -43,10 +33,7 @@ export default function AchievementsPage({ habits, completions }: AchievementsPa
     medals: achievements.ctx.habits.flatMap(h => h.perfectMonths.map(m => ({ habit: h.habit, year: m.year, month: m.month }))),
   }), [achievements]);
   const [toyOpen, setToyOpen] = useState(false);
-  const openToyBox = async () => {
-    await requestMotionPermission();
-    setToyOpen(true);
-  };
+  const hasToys = toys.badges.length + toys.medals.length > 0;
 
   if (habits.length === 0) {
     return (
@@ -69,7 +56,7 @@ export default function AchievementsPage({ habits, completions }: AchievementsPa
         sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2, overflow: 'visible' }}
       >
         <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-          <AchievementDots habits={habits} completions={completions} onOpenToyBox={toys.badges.length + toys.medals.length > 0 ? openToyBox : undefined} />
+          <AchievementDots habits={habits} completions={completions} />
         </CardContent>
       </Card>
 
@@ -89,7 +76,7 @@ export default function AchievementsPage({ habits, completions }: AchievementsPa
         sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2 }}
       >
         <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-          <AchievementBook ctx={achievements.ctx} achievements={achievements.evaluated} />
+          <AchievementBook ctx={achievements.ctx} achievements={achievements.evaluated} onOpenToyBox={hasToys ? () => setToyOpen(true) : undefined} />
         </CardContent>
       </Card>
 
