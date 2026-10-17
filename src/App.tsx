@@ -91,6 +91,8 @@ import AddHabitDialog from './AddHabitDialog';
 import RankUpEffect, { type RankUp } from './RankUpEffect';
 import { buildContext, evaluateAll } from './achievements';
 import { newAwards, type Award } from './awards';
+import { nudgeCandidates, pickNudge, readNudgeState, writeNudgeState, type NudgeState } from './nudges';
+import NudgeCard from './NudgeCard';
 import { rarityOf } from './habitStats';
 import LoginPage from './LoginPage';
 
@@ -715,6 +717,28 @@ function AppContent() {
   }, [habits, completions, loading, user]);
   const earnedBadges = useMemo(() => evaluation?.evaluated.filter(a => a.state.earned) ?? [], [evaluation]);
 
+  // 「新しい習慣を足してみませんか」の促し(最大でも 30 日に 1 回。端末に覚える)
+  const [nudgeState, setNudgeState] = useState<NudgeState | null>(readNudgeState);
+  const nudge = useMemo(() => {
+    if (!evaluation) return null;
+    return pickNudge(nudgeCandidates(evaluation.ctx, activeHabits), nudgeState, evaluation.ctx.todayStr);
+  }, [evaluation, activeHabits, nudgeState]);
+  useEffect(() => {
+    // 出し始めた・引っ込めたを覚える(state が変わらなければ何もしない)。授与式と同じく描画の後で
+    if (!nudge?.state || nudge.state === nudgeState) return;
+    const next = nudge.state;
+    writeNudgeState(next);
+    void Promise.resolve().then(() => setNudgeState(next));
+  }, [nudge, nudgeState]);
+  const closeNudge = useCallback(() => {
+    setNudgeState(prev => {
+      if (!prev) return prev;
+      const next = { ...prev, closed: true };
+      writeNudgeState(next);
+      return next;
+    });
+  }, []);
+
   // 新しく取れた勲章を見つけて溜める(初回は今ある分を「見せた」扱いにする)
   useEffect(() => {
     if (!evaluation) return;
@@ -929,6 +953,7 @@ function AppContent() {
     setNewHabitIdeal('');
     setDialogOpen(false);
     setSaving(false);
+    closeNudge();
     // 入力したカード(裏面)の姿で一覧に現れ、くるっと表(草グラフ)に返る
     setMountedBackIds(prev => new Set(prev).add(created.id));
     setFlippedIds(prev => new Set(prev).add(created.id));
@@ -1520,6 +1545,11 @@ function AppContent() {
               </Stack>
               </SortableContext>
               </DndContext>
+            )}
+
+            {/* 新しい習慣の促し(順調に続いている人にだけ、たまに) */}
+            {!loading && nudge?.nudge && (
+              <NudgeCard nudge={nudge.nudge} paperBg={paperColorFor(darkMode ? 'dark' : 'light')} onAdd={openAddDialog} onLater={closeNudge} />
             )}
 
             {/* アーカイブした習慣: 誤って押さないよう、一覧の下に小さく(設定の「アカウントを削除」と同じ形) */}
