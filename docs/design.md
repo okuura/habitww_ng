@@ -47,7 +47,8 @@ habitww_ng/
 
 ## 画面と機能
 
-- **ログイン** (`LoginPage.tsx`): Google / X の OAuth(Apple は `enabled: false`)。未ログイン時に表示。
+- **ログイン** (`LoginPage.tsx`): パスキー(Supabase 側で有効なときだけボタンを出す。登録は設定から)と
+  Google / X の OAuth(Apple は `enabled: false`)。未ログイン時に表示。
   画面全体のグラデーションと漂うぼかし円の上に、アプリアイコン(`public/app-icon-512.png` をそのまま。ベージュの余白まで含めてアイコン。加工しない)・「Habitww」・「小さな努力を大きな成長に」・ボタン。カードは無し
 - **習慣** (`App.tsx` 内): 習慣の作成/編集/削除、当日タップで完了記録。
   タップを重ねると intensity(1=達成, 2=ばっちり達成)が切り替わる。

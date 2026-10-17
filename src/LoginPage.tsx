@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
@@ -6,11 +6,13 @@ import Stack from '@mui/material/Stack';
 import CircularProgress from '@mui/material/CircularProgress';
 import { useTheme } from '@mui/material/styles';
 import { keyframes } from '@emotion/react';
+import KeyIcon from '@mui/icons-material/Key';
 import type { Provider } from '@supabase/supabase-js';
-import { supabase } from './supabase';
+import { browserHasPasskeys, fetchPasskeysEnabled, supabase } from './supabase';
 
 // ログイン画面: 画面全体のやわらかいグラデーションと漂うぼかし円の上に、アプリアイコン・Habitww・一言・ボタン。
-// カードは置かない。ログインの流れ(signInWithOAuth)は変えない
+// カードは置かない。ログインの流れ(signInWithOAuth)は変えない。
+// パスキー(Face ID・Touch ID・指紋など)のボタンは、ブラウザと Supabase の両方で使えるときだけ出す
 
 const GOOGLE_ICON = (
   <Box component="svg" viewBox="0 0 24 24" sx={{ width: 20, height: 20, flexShrink: 0 }}>
@@ -51,6 +53,10 @@ const APPLE_ICON = (
   </Box>
 );
 
+/** パスキーでログイン。`Provider` には無いので別名で */
+const PASSKEY = 'passkey' as const;
+type Method = Provider | typeof PASSKEY;
+
 /**
  * ログイン方法(Supabase → Authentication → Providers で各プロバイダの有効化が必要)。
  * enabled: false のものはボタンを出さない
@@ -87,16 +93,50 @@ const BLOBS = [
   { left: '20%', top: '62%', size: 'min(65vw, 380px)', color: '#c5e1a5', opacity: 0.6, darkOpacity: 0.18, anim: drift3, duration: 18 },
 ];
 
+function LoginButton({ label, icon, bg, fg, outlined, busy, disabled, onClick }: {
+  label: string; icon: ReactNode; bg: string; fg: string; outlined?: boolean; busy: boolean; disabled: boolean; onClick: () => void;
+}) {
+  return (
+    <Button
+      fullWidth
+      disabled={disabled}
+      onClick={onClick}
+      sx={{
+        position: 'relative', height: 52, borderRadius: '14px', fontWeight: 700, fontSize: '0.95rem', textTransform: 'none',
+        bgcolor: bg, color: fg, border: outlined ? '1px solid rgba(0,0,0,0.1)' : 'none',
+        boxShadow: '0 2px 10px rgba(20,60,40,0.1)',
+        transition: 'transform .12s, box-shadow .12s, filter .12s',
+        '&:hover': { bgcolor: bg, filter: 'brightness(0.97)', boxShadow: '0 6px 18px rgba(20,60,40,0.16)' },
+        '&:active': { transform: 'scale(0.985)' },
+        '&.Mui-disabled': { bgcolor: bg, color: fg, opacity: busy ? 1 : 0.55 },
+      }}
+    >
+      <Box sx={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', display: 'flex', color: fg }}>
+        {busy ? <CircularProgress size={18} sx={{ color: fg }} /> : icon}
+      </Box>
+      {label}
+    </Button>
+  );
+}
+
 export default function LoginPage() {
   const theme = useTheme();
   const dark = theme.palette.mode === 'dark';
-  const [loading, setLoading] = useState<Provider | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [loading, setLoading] = useState<Method | null>(null);
+  const [failed, setFailed] = useState<Method | null>(null);
+  const [passkeyReady, setPasskeyReady] = useState(false);
+
+  useEffect(() => {
+    if (!browserHasPasskeys()) return;
+    let alive = true;
+    fetchPasskeysEnabled().then(ok => { if (alive && ok) setPasskeyReady(true); });
+    return () => { alive = false; };
+  }, []);
 
   const handleLogin = async (provider: Provider) => {
     if (loading) return;
     setLoading(provider);
-    setFailed(false);
+    setFailed(null);
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
@@ -104,7 +144,21 @@ export default function LoginPage() {
       },
     });
     // 成功ならこのあとリダイレクトされる。戻ってきたら失敗
-    if (error) { setLoading(null); setFailed(true); }
+    if (error) { setLoading(null); setFailed(provider); }
+  };
+
+  // パスキー: 端末のダイアログで選んで認証。成功するとセッションが入り、App 側の onAuthStateChange で画面が切り替わる
+  const handlePasskey = async () => {
+    if (loading) return;
+    setLoading(PASSKEY);
+    setFailed(null);
+    const { data, error } = await supabase.auth.signInWithPasskey();
+    if (error || !data?.session) {
+      setLoading(null);
+      // 自分でキャンセルしたときは何も言わない
+      const code = (error as { code?: string } | null)?.code;
+      if (code !== 'ERROR_CEREMONY_ABORTED') setFailed(PASSKEY);
+    }
   };
 
   return (
@@ -154,38 +208,41 @@ export default function LoginPage() {
         </Typography>
 
         <Stack spacing={1.25}>
+          {passkeyReady && (
+            <LoginButton
+              label="パスキーで続ける"
+              icon={<KeyIcon sx={{ fontSize: 22, transform: 'rotate(-45deg)' }} />}
+              bg={dark ? '#1f3d32' : '#2e7d32'}
+              fg="#ffffff"
+              busy={loading === PASSKEY}
+              disabled={loading !== null}
+              onClick={handlePasskey}
+            />
+          )}
           {LOGIN_PROVIDERS.filter(p => p.enabled).map(({ provider, label, icon }) => {
             const filledDark = provider === 'x' || provider === 'apple';
             const bg = filledDark ? (dark ? '#ffffff' : '#0f0f0f') : '#ffffff';
             const fg = filledDark ? (dark ? '#0f0f0f' : '#ffffff') : '#1a1a1a';
-            const busy = loading === provider;
             return (
-              <Button
+              <LoginButton
                 key={provider}
-                fullWidth
+                label={label}
+                icon={icon}
+                bg={bg}
+                fg={fg}
+                outlined={!filledDark}
+                busy={loading === provider}
                 disabled={loading !== null}
                 onClick={() => handleLogin(provider)}
-                sx={{
-                  position: 'relative', height: 52, borderRadius: '14px', fontWeight: 700, fontSize: '0.95rem', textTransform: 'none',
-                  bgcolor: bg, color: fg, border: filledDark ? 'none' : '1px solid rgba(0,0,0,0.1)',
-                  boxShadow: '0 2px 10px rgba(20,60,40,0.1)',
-                  transition: 'transform .12s, box-shadow .12s, filter .12s',
-                  '&:hover': { bgcolor: bg, filter: 'brightness(0.97)', boxShadow: '0 6px 18px rgba(20,60,40,0.16)' },
-                  '&:active': { transform: 'scale(0.985)' },
-                  '&.Mui-disabled': { bgcolor: bg, color: fg, opacity: busy ? 1 : 0.55 },
-                }}
-              >
-                <Box sx={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', display: 'flex', color: fg }}>
-                  {busy ? <CircularProgress size={18} sx={{ color: fg }} /> : icon}
-                </Box>
-                {label}
-              </Button>
+              />
             );
           })}
         </Stack>
         {failed && (
           <Typography variant="caption" sx={{ display: 'block', color: 'error.main', mt: 1.5 }}>
-            ログインできませんでした。もう一度お試しください
+            {failed === PASSKEY
+              ? 'パスキーでログインできませんでした。先に Google か X でログインして、設定でパスキーを登録してください'
+              : 'ログインできませんでした。もう一度お試しください'}
           </Typography>
         )}
       </Box>

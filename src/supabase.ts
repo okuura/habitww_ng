@@ -3,7 +3,22 @@ import { createClient, type User } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// パスキー(WebAuthn)の API は supabase-js では実験的扱いで、ここで有効にしないと呼べない
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, { auth: { experimental: { passkey: true } } });
+
+/** このブラウザでパスキー(WebAuthn)が使えるか */
+export const browserHasPasskeys = () =>
+  typeof window !== 'undefined' && typeof window.PublicKeyCredential !== 'undefined' && !!navigator.credentials;
+
+let passkeysEnabledPromise: Promise<boolean> | null = null;
+/** Supabase 側でパスキーが有効になっているか(Authentication → Passkeys)。公開の設定なので匿名で読める。失敗したら false */
+export function fetchPasskeysEnabled(): Promise<boolean> {
+  passkeysEnabledPromise ??= fetch(`${supabaseUrl}/auth/v1/settings`, { headers: { apikey: supabaseAnonKey } })
+    .then(r => (r.ok ? r.json() : null))
+    .then(j => !!(j as { passkeys_enabled?: boolean } | null)?.passkeys_enabled)
+    .catch(() => false);
+  return passkeysEnabledPromise;
+}
 
 /** 表示名。設定で決めた名前(display_name)を優先し、無ければログイン元(Google など)の名前。
  *  name はログインのたびにログイン元の値で上書きされるので、自分で決めた名前は別のキーに持つ */
